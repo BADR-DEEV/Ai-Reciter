@@ -4,3 +4,7 @@ librosa
 soundfile 
 epitran
 numpy
+torch
+evaluate
+transformers
+torchaudio
