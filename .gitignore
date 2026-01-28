@@ -1,0 +1,41 @@
+
+# Virtual environments
+venv/
+.venv/
+*/venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Large data folders
+Dataset/
+data/
+*.mat
+*.csv
+*.mp4
+*.wav
+*.mp3
+*.npz
+.svg
+!small_config.csv   # (only allow if needed)
+
+# Models
+*.joblib
+*.pkl
+*.h5
+*.pt
+
+# EMD extracted features
+feature.csv
+feature_fault.csv
+
+# Logs
+*.log
+
+# VSCode
+.vscode/
+
+# Anything generated
+*.dll
+*.exe
