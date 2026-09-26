@@ -6,13 +6,13 @@ import base64
 import unicodedata
 import requests
 
-INPUT_JSON = "QaloonData_v10(1).json"
-OUT_DIR = "dataset_qaloon_final"
-AUDIO_DIR = os.path.join(OUT_DIR, "audio")
-METADATA = os.path.join(OUT_DIR, "metadata.jsonl")
-MISSING = os.path.join(OUT_DIR, "missing_audio.json")
+INPUT_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "QaloonData_v10(1).json")
+# OUT_DIR = "dataset_qaloon_final"
+# AUDIO_DIR = os.path.join(OUT_DIR, "audio")
+# METADATA = os.path.join(OUT_DIR, "metadata.jsonl")
+# MISSING = os.path.join(OUT_DIR, "missing_audio.json")
 
-os.makedirs(AUDIO_DIR, exist_ok=True)
+# os.makedirs(AUDIO_DIR, exist_ok=True)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
@@ -23,6 +23,7 @@ RECITERS = [
     "moshaf/qaloon/waleed_allebi",
     "moshaf/qaloon/Husary",
     "moshaf/qaloon/Menshawi",
+    "moshaf/qaloon/Huthaify",
 ]
 
 ARABIC = set("ءاأإآؤئبتثجحخدذرزسشصضطظعغفقكلمنهويىة")
@@ -138,6 +139,70 @@ def normalize_asr(text):
             .replace("ؤ", "و")
             .replace("ئ", "ي")
     )
+
+
+def normalize_quran_for_asr(text: str) -> str:
+    """Normalize Qālūn Uthmani spelling for unvowelled, MSA-style ASR labels.
+
+    Resolve dagger-alif seats before removing the dagger; preserve medial
+    hamzas and word-final alif maqṣūra rather than phoneticizing the spelling.
+    """
+    text = str(text)
+    text = re.sub(r"[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00A0]", " ", text)
+    text = re.sub(r"[\u0660-\u0669\u06F0-\u06F9\d]", "", text)
+    text = fix_combining_hamza(text)
+    text = text.replace("ے", "ي").replace("ی", "ي").replace("ک", "ك")
+    text = re.sub(r"[\u06D6-\u06ED\u06EE-\u06EF\u08F0-\u08F3]", "", text)
+    text = re.sub(r"[\u0610-\u061A\u064B-\u065F\u0674]", "", text)
+    text = text.replace("ـ", "")
+
+    # Suffixal yaa-seat: أتيٰك -> أتاك, but موسىٰ -> موسى.
+    text = re.sub(r"[يى]\u0670(?=[\u0621-\u064A])", "ا", text)
+    text = re.sub(r"ى\u0670(?![\u0621-\u064A])", "ى", text)
+    # The waw is an orthographic seat, not a pronounced consonant.
+    text = re.sub(r"و\u0670(?=ة)", "ا", text)
+
+    # Closed-list exceptions to productive dagger-alif expansion. Correct
+    # both annotated and accidentally expanded spellings at word boundaries.
+    exceptions = {
+        "الرحمان": "الرحمن", "هاذا": "هذا", "هاذه": "هذه",
+        "هاؤلاء": "هؤلاء", "هاذان": "هذان", "ذالك": "ذلك",
+        "ذالكم": "ذلكم", "لاكن": "لكن", "إلاه": "إله",
+        "اللاه": "الله", "طاها": "طه", "ياس": "يس",
+    }
+
+    def normalize_word(match):
+        word = match.group()
+        expanded = word.replace("\u0670", "ا")
+        return exceptions.get(expanded, expanded)
+
+    text = re.sub(r"[\u0621-\u064A\u0670\u0671]+", normalize_word, text)
+    text = re.sub(r"[إأآٱ]", "ا", text)
+    text = re.sub(r"[^\u0621-\u063A\u0641-\u064A\s]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+# Backward-compatible name used by existing dataset builders.
+normalize_qaloon_for_asr = normalize_quran_for_asr
+
+
+def _test_normalize_quran_for_asr():
+    examples = {
+        "هَلْ أَتَيٰكَ حَدِيثُ مُوسَىٰ": "هل اتاك حديث موسى",
+        "إِذْ نَادَيٰهُ رَبُّهُۥ": "اذ ناداه ربه",
+        "وَنَهَى ٱلنَّفْسَ عَنِ ٱلْهَوَىٰ": "ونهى النفس عن الهوى",
+        "وَالْمَلَائِكَةُ صَفًّا": "والملائكة صفا",
+        "اِ۬لْحَمْدُ لِلهِ رَبِّ اِ۬لْعَٰلَمِينَ": "الحمد لله رب العالمين",
+        "اَ۬لرَّحْمَٰنِ اِ۬لرَّحِيمِ": "الرحمن الرحيم",
+        "مَلِكِ يَوْمِ اِ۬لدِّينِ": "ملك يوم الدين",
+        "اِ۬لذِے هُمْ فِيهِ مُخْتَلِفُونَ": "الذي هم فيه مختلفون",
+        "وَأَقِيمُواْ اَ۬لصَّلَوٰةَ": "واقيموا الصلاة",
+        "الزكوٰة الحيوٰة مشكوٰة غدوٰة منوٰة": "الزكاة الحياة مشكاة غداة مناة",
+        "تَوَفَّيٰهُم وَمُؤْمِنٌ وَعِيسَىٰ": "توفاهم ومؤمن وعيسى",
+    }
+    for raw, expected in examples.items():
+        actual = normalize_quran_for_asr(raw)
+        assert actual == expected, (raw, actual, expected)
 
 
 def validate(text, s, a):
@@ -406,12 +471,12 @@ def main():
             "reciter": reciter,
         })
 
-    with open(METADATA, "w", encoding="utf-8") as f:
-        for row in rows:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    # with open(METADATA, "w", encoding="utf-8") as f:
+    #     for row in rows:
+    #         f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    with open(MISSING, "w", encoding="utf-8") as f:
-        json.dump(missing, f, ensure_ascii=False, indent=2)
+    # with open(MISSING, "w", encoding="utf-8") as f:
+    #     json.dump(missing, f, ensure_ascii=False, indent=2)
 
     print(
         f"Done: {len(rows)} samples | "

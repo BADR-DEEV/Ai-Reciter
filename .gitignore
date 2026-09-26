@@ -29,6 +29,7 @@ data/
 # EMD extracted features
 feature.csv
 feature_fault.csv
+Revised_data.csv 
 
 # Logs
 *.log
