@@ -6,6 +6,7 @@ import base64
 import shutil
 import unicodedata
 import requests
+from qaloon_audio2text import normalize_with_harakat
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
@@ -277,6 +278,7 @@ def process_single_ayah(item, db):
             "relative_audio_path": f"audio/{wav_filename}",
             "text": data["text"],
             "text_asr_normalized": data["text_asr"],
+            "normalized_with_harakat": normalize_with_harakat(data["raw"]),
             "text_raw_uthmani": data["raw"],
             "source_ayahs": data.get("source_ayahs", [ayah]),
             "reciter": reciter,

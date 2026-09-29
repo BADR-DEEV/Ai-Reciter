@@ -1,5 +1,12 @@
 # Qālūn Whisper tiny/base: LoRA and zero-shot comparison
 
+> This documents the original three-reciter experiment. For the current four-
+> reciter RTX 5070 pipeline, actual CPU-run results, duration handling and V2,
+> see [`../training_with_gpu/README.md`](../training_with_gpu/README.md).
+> Reproducing the old three-reciter experiment requires explicitly passing
+> `--include-reciter huthaify husary dokali`; the shared loader now defaults
+> to **four** reciters, and groups Fātiḥah as one split to avoid leakage.
+
 The scripts use `src/dataset_collection/dataset_qaloon_{hutafi,Husary,dokali}/metadata.jsonl`
 and each directory's `audio/` WAV files. They train on `text_asr_normalized`, not
 the vowelled Uthmani transcription. Source collection and transcription are
@@ -55,7 +62,7 @@ validation and untouched test sets after training.
 ### Reciter selection
 
 Both scripts accept `--include-reciter` and `--exclude-reciter` with keys
-`huthaify`, `husary`, `dokali`. The default includes all three. For example:
+`huthaify`, `husary`, `dokali`, `waleed`. The default includes all four. For example:
 
 ```bash
 python src/training/train_qaloon_lora.py --model tiny --include-reciter husary dokali --exclude-reciter dokali --output-dir runs/husary_tiny
@@ -70,7 +77,7 @@ samples, `--include-bismillah` opts into them when present.
 
 ## Kaggle notebook cells
 
-Upload the three `dataset_qaloon_*` directories as a Kaggle dataset, preserving
+Upload the four `dataset_qaloon_*` directories as a Kaggle dataset, preserving
 the metadata/audio structure. Enable **GPU** and **Internet** (for the first
 model download and package installation); add this repository as a Kaggle
 dataset too, or clone it. Replace the two paths below with your actual `/kaggle/input/`
@@ -78,7 +85,7 @@ mounts. `/kaggle/input` is read-only; save outputs under `/kaggle/working`.
 
 ```python
 !pip -q install -r /kaggle/input/ai-reciter/src/training/requirements_qaloon.txt
-DATA = "/kaggle/input/qaloon-audio"  # contains the three dataset_qaloon_* directories
+DATA = "/kaggle/input/qaloon-audio"  # contains the four dataset_qaloon_* directories
 CODE = "/kaggle/input/ai-reciter/src/training"
 !python {CODE}/compare_qaloon_zero_shot.py --data-root {DATA} --output-dir /kaggle/working/zero_shot
 !python {CODE}/train_qaloon_lora.py --model tiny --data-root {DATA} --output-dir /kaggle/working/tiny_lora --batch-size 2 --gradient-accumulation 8
@@ -103,7 +110,7 @@ matches. Scores are fractions (0.12 = 12% error). No benchmark score is
 claimed here: training and zero-shot inference must actually be run to obtain
 one.
 
-The deterministic split is keyed on `(surah, ayah)` rather than filenames:
+The deterministic split is keyed on `(surah, ayah)` (Fātiḥah grouped as one unit) rather than filenames:
 all recordings of an ayah go to the *same* train/validation/test partition,
 preventing the exact reference text from appearing in another reciter's
 training partition. Split fractions are approximately 80/10/10. These tests

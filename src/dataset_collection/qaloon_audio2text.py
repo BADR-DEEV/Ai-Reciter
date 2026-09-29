@@ -186,6 +186,22 @@ def normalize_quran_for_asr(text: str) -> str:
 normalize_qaloon_for_asr = normalize_quran_for_asr
 
 
+def normalize_with_harakat(text: str) -> str:
+    """Clean Qālūn annotations without removing attested vowels/shaddah/madd.
+
+    This is a *diacritized transcription*, not a tajweed-error label. Dagger
+    alif is kept as written; do not invent pronunciation from silent text.
+    """
+    text = str(text)
+    text = re.sub(r"[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u00A0]", " ", text)
+    text = re.sub(r"[\u0660-\u0669\u06F0-\u06F9\d]", "", text)
+    text = fix_combining_hamza(text)
+    text = text.replace("ے", "ي").replace("ی", "ي").replace("ک", "ك").replace("ـ", "")
+    text = re.sub(r"[\u06D6-\u06EF\u08F0-\u08F3]", "", text)
+    text = re.sub(r"[^\u0621-\u063A\u0641-\u065F\u0670\u0671\s]", " ", text)
+    return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text)).strip()
+
+
 def _test_normalize_quran_for_asr():
     examples = {
         "هَلْ أَتَيٰكَ حَدِيثُ مُوسَىٰ": "هل اتاك حديث موسى",
@@ -467,6 +483,7 @@ def main():
             "relative_audio_path": f"audio/{filename}",
             "text": data["text"],
             "text_asr_normalized": data["text_asr"],
+            "normalized_with_harakat": normalize_with_harakat(data["raw"]),
             "text_raw_uthmani": data["raw"],
             "reciter": reciter,
         })

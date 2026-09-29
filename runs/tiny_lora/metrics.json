@@ -1,0 +1,48 @@
+{
+  "model": "openai/whisper-tiny",
+  "seed": 42,
+  "reciters": [
+    "dokali",
+    "husary",
+    "huthaify"
+  ],
+  "counts": {
+    "train": 1382,
+    "validation": 141,
+    "test": 180
+  },
+  "skipped_over_30s": [
+    [
+      "husary",
+      78,
+      40,
+      37.58
+    ],
+    [
+      "husary",
+      98,
+      5,
+      33.88
+    ],
+    [
+      "husary",
+      98,
+      6,
+      30.84
+    ],
+    [
+      "husary",
+      98,
+      8,
+      35.62
+    ]
+  ],
+  "validation": {
+    "wer": 0.7308377896613191,
+    "cer": 0.25316455696202533
+  },
+  "test": {
+    "wer": 0.6436781609195402,
+    "cer": 0.22729578893962454
+  }
+}

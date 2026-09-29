@@ -4,7 +4,7 @@ import shutil
 import argparse
 import requests
 
-from qaloon_audio2text import load_quran, AYAH_MERGES, normalize_quran_for_asr
+from qaloon_audio2text import load_quran, AYAH_MERGES, normalize_quran_for_asr, normalize_with_harakat
 
 
 # =========================================================
@@ -267,6 +267,7 @@ def main():
                     rows.append({"surah": 1, "ayah": 0, "audio_filename": filename,
                                  "relative_audio_path": f"audio/{filename}", "text": "بسم الله الرحمن الرحيم",
                                  "text_asr_normalized": normalize_quran_for_asr(raw),
+                                 "normalized_with_harakat": normalize_with_harakat(raw),
                                  "text_raw_uthmani": raw, "source_ayahs": [], "reciter": reciter,
                                  "start_time": 0, "end_time": intro_end})
 
@@ -297,6 +298,7 @@ def main():
                     "relative_audio_path": f"audio/{filename}",
                     "text": data["text"],
                     "text_asr_normalized": normalize_quran_for_asr(data["raw"]),
+                    "normalized_with_harakat": normalize_with_harakat(data["raw"]),
                     "text_raw_uthmani": data["raw"],
                     "source_ayahs": source_ayahs,
                     "reciter": reciter,
