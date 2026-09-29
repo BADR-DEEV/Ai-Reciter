@@ -40,3 +40,101 @@ Revised_data.csv
 # Anything generated
 *.dll
 *.exe
+# =====================================================================
+# 1. Model Weights, Checkpoints & Training Runs (DO NOT PUSH TO GIT)
+# =====================================================================
+runs/
+checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.onnx
+*.engine
+
+# CTranslate2 / faster-whisper exported models
+deployable_*/
+*_ct2/
+
+# =====================================================================
+# 2. Datasets & Audio Files (Too large for GitHub)
+# =====================================================================
+dataset_qaloon_*/
+data/
+datasets/
+raw_audio/
+
+# Ignore personal test audio files in root and subdirectories
+*.wav
+*.mp3
+*.m4a
+*.ogg
+*.flac
+*.aac
+
+# =====================================================================
+# 3. Python Artifacts & Caches
+# =====================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# =====================================================================
+# 4. Virtual Environments
+# =====================================================================
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# =====================================================================
+# 5. Deep Learning Frameworks & Logging
+# =====================================================================
+# Hugging Face caches
+.cache/
+huggingface/
+
+# Tensorboard / Weights & Biases
+wandb/
+runs/
+events.out.tfevents.*
+
+# =====================================================================
+# 6. IDEs & Operating System Files
+# =====================================================================
+# VS Code
+.vscode/
+*.code-workspace
+
+# PyCharm / JetBrains
+.idea/
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
