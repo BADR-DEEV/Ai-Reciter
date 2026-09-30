@@ -1,0 +1,56 @@
+import { test, expect } from "@playwright/test";
+
+test("local Quran assets and surah selection", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Begin recitation" })).toBeEnabled();
+  await page.getByRole("button", { name: "Mushaf", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Quran page 001" })).toBeVisible();
+  await page.locator(".surah-select").click();
+  await page.getByRole("textbox", { name: "Search surahs" }).fill("112");
+  await page.locator(".surah-list button").click();
+  await expect(page.locator(".surah-select")).toContainText("Al-Ikhlāṣ");
+  await page.getByRole("button", { name: "Ayah view", exact: true }).click();
+  await expect(page.locator(".text-ayah")).toHaveCount(4);
+});
+
+test("clearly labeled demo highlights and reset", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Try the presentation demo" })).toBeEnabled();
+  await page.getByRole("button", { name: "Try the presentation demo" }).click();
+  await expect(page.locator(".demo-banner")).toContainText("No microphone or model inference");
+  const firstAyah = page.locator('.text-ayah[data-ayah="1"]');
+  await expect(firstAyah.locator('[data-word-index="0"]')).toHaveAttribute("data-status", "correct");
+  await expect(firstAyah.locator('[data-word-index="1"]')).toHaveAttribute("data-status", "missed");
+  await expect(firstAyah.locator('[data-word-index="3"]')).toHaveAttribute("data-status", "pending");
+  await expect(page.locator(".text-ayah.correct")).toHaveCount(2, { timeout: 8000 });
+  await expect(page.locator(".text-ayah.missed")).toHaveCount(1, { timeout: 4000 });
+  await page.getByRole("button", { name: "Finish recitation" }).click();
+  await page.getByRole("button", { name: "Reset session" }).click();
+  await expect(page.locator(".text-ayah.correct")).toHaveCount(0);
+  await expect(page.locator(".text-mushaf .quran-word.correct, .text-mushaf .quran-word.missed")).toHaveCount(0);
+  await expect(page.locator(".demo-banner")).toHaveCount(0);
+});
+
+test("mobile layout stays inside viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Begin recitation" })).toBeEnabled();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+  expect(overflow).toBe(false);
+});
+
+test("help explains score limitations", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "How it works", exact: true }).first().click();
+  await expect(page.getByRole("dialog")).toContainText("not model probabilities");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("invalid uploads show a useful error and allow retry", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Upload audio to test" })).toBeEnabled();
+  await page.getByLabel("Choose audio recording").setInputFiles({ name: "invalid.wav", mimeType: "audio/wav", buffer: Buffer.from("not an audio recording") });
+  await expect(page.locator(".error-message")).toContainText("Cannot decode this audio file");
+  await expect(page.getByRole("button", { name: "Upload audio to test" })).toBeEnabled();
+});

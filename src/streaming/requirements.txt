@@ -1,0 +1,6 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.34,<1
+requests>=2.32,<3
+# Reuse the CUDA torch / transformers installation used for training.
+numpy>=1.26
+transformers>=4.46,<5

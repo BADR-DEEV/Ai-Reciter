@@ -5,6 +5,7 @@ import argparse
 import requests
 
 from qaloon_audio2text import load_quran, AYAH_MERGES, normalize_quran_for_asr, normalize_with_harakat
+from quran_geometry import geometry_fields
 
 
 # =========================================================
@@ -204,6 +205,7 @@ def get_timing(surah, read_id):
             f"Invalid timing response for Surah {surah}"
         )
 
+
     return fix_timings(
         surah,
         timings
@@ -304,6 +306,7 @@ def main():
                     "reciter": reciter,
                     "start_time": start_time,
                     "end_time": end_time,
+                    **geometry_fields(surah, [ayah]),
                 })
 
             for expected in sorted(a for s, a in quran if s == surah):

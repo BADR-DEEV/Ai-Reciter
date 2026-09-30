@@ -138,3 +138,15 @@ $RECYCLE.BIN/
 .DS_Store
 .AppleDouble
 .LSOverride
+
+# Presentation interface
+node_modules/
+.next/
+*.tsbuildinfo
+.env.local
+*.before-geometry.bak
+web/public/quran/
+web/test-results/
+web/playwright-report/
+!web/lib/
+!web/lib/**

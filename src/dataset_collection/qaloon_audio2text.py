@@ -443,6 +443,7 @@ def apply_ayah_merges(db):
 
 
 def main():
+    from quran_geometry import geometry_fields
     db = load_quran()
     rows = []
     missing = []
@@ -486,6 +487,8 @@ def main():
             "normalized_with_harakat": normalize_with_harakat(data["raw"]),
             "text_raw_uthmani": data["raw"],
             "reciter": reciter,
+            **geometry_fields(surah, [ayah - 1] if surah == 1 and ayah < 7
+                              else [6, 7] if surah == 1 else [ayah]),
         })
 
     # with open(METADATA, "w", encoding="utf-8") as f:
