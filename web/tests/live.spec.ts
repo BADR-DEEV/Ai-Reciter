@@ -9,7 +9,7 @@ test.use({
 test("microphone worklet streams real audio to local GPU", async ({ page }) => {
   test.skip(!audio, "Set RECITER_LIVE_TEST_AUDIO to an absolute PCM WAV fixture and start the backend");
   test.setTimeout(45000);
-  await page.goto("/");
+  await page.goto("/studio");
   await expect(page.getByRole("button", { name: "Begin recitation", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Begin recitation", exact: true }).click();
   await expect(page.getByRole("heading", { name: "We’re listening." })).toBeVisible();
@@ -30,7 +30,7 @@ test("uploaded recording uses the GPU without requesting a microphone", async ({
   await page.addInitScript(() => {
     navigator.mediaDevices.getUserMedia = async () => { throw new Error("Upload must not request a microphone"); };
   });
-  await page.goto("/");
+  await page.goto("/studio");
   await expect(page.getByRole("button", { name: "Upload audio to test" })).toBeEnabled();
   await page.getByRole("button", { name: "Upload audio to test" }).click();
   await page.getByLabel("Choose audio recording").setInputFiles(audio!);

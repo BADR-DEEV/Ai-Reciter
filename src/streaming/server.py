@@ -1,5 +1,6 @@
 """Local PCM/WebSocket inference service for the trained full Whisper base model."""
 import asyncio
+import base64
 from contextlib import asynccontextmanager, suppress
 import json
 import logging
@@ -7,15 +8,20 @@ import os
 from pathlib import Path
 import time
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
+from pydantic import BaseModel, Field
 import torch
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
 
 from .matcher import RecitationTracker
+from . import practice as lessons
 
 ROOT = Path(__file__).resolve().parents[2]
 MODEL_PATH = Path(os.environ.get("RECITER_MODEL_PATH", ROOT / "runs" / "gpu_base_full"))
+# A missing local directory is treated as a Hugging Face model id (development only).
+LOCAL_MODEL = MODEL_PATH.is_dir()
 ASSETS = ROOT / "web" / "public" / "quran"
 ORIGINS = set(os.environ.get("RECITER_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(","))
 SAMPLE_RATE = 16000
@@ -27,10 +33,10 @@ logger = logging.getLogger("reciter")
 class Engine:
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.processor = WhisperProcessor.from_pretrained(str(MODEL_PATH), local_files_only=True)
+        self.processor = WhisperProcessor.from_pretrained(str(MODEL_PATH), local_files_only=LOCAL_MODEL)
         dtype = torch.float16 if self.device == "cuda" else torch.float32
         self.model = WhisperForConditionalGeneration.from_pretrained(
-            str(MODEL_PATH), local_files_only=True, torch_dtype=dtype).to(self.device).eval()
+            str(MODEL_PATH), local_files_only=LOCAL_MODEL, torch_dtype=dtype).to(self.device).eval()
         self.lock = asyncio.Lock()
 
     def transcribe(self, audio):
@@ -44,11 +50,21 @@ class Engine:
                                       max_new_tokens=180, do_sample=False)
         return self.processor.batch_decode(ids, skip_special_tokens=True)[0].strip()
 
+    def check(self, audio, candidates):
+        """Blind transcript plus closed-set candidate likelihoods for one short clip."""
+        transcript = self.transcribe(audio)
+        if len(candidates) < 2:
+            return transcript, []
+        inputs = self.processor(audio, sampling_rate=SAMPLE_RATE, return_tensors="pt")
+        features = inputs.input_features.to(self.device, dtype=self.model.dtype)
+        return transcript, lessons.candidate_logprobs(self.model, self.processor.tokenizer, features, candidates)
+
 
 @asynccontextmanager
 async def lifespan(app):
     if not (ASSETS / "manifest.json").exists():
-        raise RuntimeError("First run: python src/dataset_collection/cache_quran_pages.py")
+        # Lessons work without the Mushaf cache; the studio needs it.
+        logger.warning("Quran assets missing. For the studio run: python src/dataset_collection/cache_quran_pages.py")
     app.state.engine = await asyncio.to_thread(Engine)
     app.state.sessions = 0
     logger.info("Loaded %s on %s", MODEL_PATH, app.state.engine.device)
@@ -56,6 +72,46 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Qaloon Live Recitation", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=sorted(ORIGINS), allow_methods=["GET", "POST"],
+                   allow_headers=["Content-Type"])
+MAX_PRACTICE_SECONDS = 15
+
+
+class PracticeRequest(BaseModel):
+    mode: str = Field(pattern="^(sound|reading)$")
+    audio: str = Field(max_length=SAMPLE_RATE * MAX_PRACTICE_SECONDS * 2 * 4 // 3 + 8)  # base64 PCM16
+    target: str = Field(min_length=1, max_length=400)
+    alternatives: list[str] = Field(default_factory=list, max_length=6)
+
+
+@app.post("/api/practice")
+async def practice(body: PracticeRequest, request: Request):
+    """Score one short learner recording for a lesson exercise."""
+    origin = request.headers.get("origin")
+    if origin is not None and origin not in ORIGINS:
+        raise HTTPException(403, "Origin not allowed")
+    try:
+        raw = base64.b64decode(body.audio, validate=True)
+    except ValueError:
+        raise HTTPException(400, "Audio must be base64 PCM16")
+    if len(raw) % 2 or len(raw) < SAMPLE_RATE // 5:
+        raise HTTPException(400, "Recording is too short")
+    audio = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768
+    if lessons.is_silent(audio):
+        return {"verdict": "silent"}
+    candidates = [lessons.plain(body.target)]
+    if body.mode == "sound" and not 0 < len(candidates[0]) <= 60:
+        raise HTTPException(400, "Sound checks need a short target")
+    for text in map(lessons.plain, body.alternatives):
+        if text and len(text) <= 60 and text not in candidates:
+            candidates.append(text)
+    engine = app.state.engine
+    async with engine.lock:
+        transcript, logprobs = await asyncio.to_thread(
+            engine.check, audio, candidates if body.mode == "sound" else [])
+    if body.mode == "reading" or len(candidates) < 2:
+        return lessons.assess_reading(body.target, transcript)
+    return lessons.assess_sound(candidates, 0, logprobs, transcript)
 
 
 @app.get("/health")

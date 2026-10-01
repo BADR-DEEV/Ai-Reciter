@@ -23,7 +23,9 @@ npm install
 npm run dev
 ```
 
-Open **http://127.0.0.1:3000**. Allow microphone access and choose **Begin recitation**.
+Open **http://127.0.0.1:3000** for the beginner course (alphabet → short surahs; see
+[`docs/LEARN_TO_READ.md`](docs/LEARN_TO_READ.md)). The recitation studio lives at
+**http://127.0.0.1:3000/studio**. Allow microphone access and choose **Begin recitation**.
 No microphone/headphones? Select your surah, click **Upload audio to test**, and
 choose a WAV, MP3, or another browser-supported audio recording (up to 50 MB / 10
 minutes). The recording is decoded locally and silently streamed at real-time
