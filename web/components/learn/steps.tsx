@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Mic2, Pause, Volume2 } from "lucide-react";
+import { Loader2, Mic2, Pause, Volume2 } from "lucide-react";
 import type { Step } from "@/lib/learn/curriculum";
 import { PLACE_LABEL, forms, letter } from "@/lib/learn/letters";
 import { SURAHS } from "@/lib/learn/surahs";
@@ -104,19 +104,24 @@ export function AyahStep({ step, online, onScore }: { step: Extract<Step, { kind
   const { t } = useLang();
   const surah = SURAHS.find(s => s.id === step.surah)!;
   const ayah = surah.ayahs.find(a => a.ayah === step.ayah)!;
-  const [playing, setPlaying] = useState(false);
+  const [audio, setAudio] = useState<"idle" | "loading" | "playing" | "failed">("idle");
   useEffect(() => () => stopClip(), []);
   const play = () => {
-    if (playing) { stopClip(); setPlaying(false); return; }
-    setPlaying(true);
-    playClip(surah.audio, ayah.start, ayah.end, () => setPlaying(false));
+    if (audio === "playing" || audio === "loading") { stopClip(); setAudio("idle"); return; }
+    setAudio("loading");
+    playClip(surah.audio, ayah.start, ayah.end, () => setAudio("playing"),
+      result => setAudio(current => result === "failed" ? "failed" : current === "loading" || current === "playing" ? "idle" : current));
   };
   return <div className="step-ayah">
     <p className="ayah-ref">{surah.name} · Ayah {ayah.ayah}</p>
     <p className="ayah-text" lang="ar" dir="rtl">{ayah.text}</p>
     <p className="ayah-translit">{ayah.translit}</p>
     <p className="ayah-meaning"><span>{t("meaning")}:</span> {ayah.meaning}</p>
-    <button className="btn-listen" onClick={play}>{playing ? <Pause size={17} /> : <Mic2 size={17} />} {playing ? "Pause" : "Listen to Al-Husary"}</button>
+    <button className="btn-listen" onClick={play}>
+      {audio === "loading" ? <Loader2 className="spin" size={17} /> : audio === "playing" ? <Pause size={17} /> : <Mic2 size={17} />}
+      {audio === "loading" ? "Loading recitation…" : audio === "playing" ? "Stop" : "Listen to Al-Husary"}
+    </button>
+    {audio === "failed" && <p className="say-error" role="alert">Couldn’t load the recitation. Check your internet connection and try again.</p>}
     <SayPanel compact arabic={ayah.text} translit={ayah.translit} mode="reading" online={online} onScore={onScore} />
   </div>;
 }
