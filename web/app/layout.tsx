@@ -4,7 +4,7 @@ import "./learn.css";
 import { LanguageProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {
-  title: "Tarteel · Learn to recite the Quran",
+  title: "Rattil · Learn to recite the Quran",
   description: "Learn to read and recite the Quran from the first letter, with a speech model that listens.",
 };
 

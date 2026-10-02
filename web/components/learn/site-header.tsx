@@ -9,7 +9,7 @@ export function SiteHeader({ active }: { active: "home" | "learn" }) {
   const { progress, loaded } = useProgress();
   const days = streak(progress.days);
   return <header className="lh-header">
-    <a className="lh-wordmark" href="/">tarteel<span lang="ar">ترتيل</span></a>
+    <a className="lh-wordmark" href="/">rattil<span lang="ar">رَتِّل</span></a>
     <nav className="lh-nav" aria-label="Main">
       <a href="/" aria-current={active === "home" ? "page" : undefined}>{t("home")}</a>
       <a href="/learn" aria-current={active === "learn" ? "page" : undefined}>{t("learn")}</a>

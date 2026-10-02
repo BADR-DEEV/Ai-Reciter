@@ -1,4 +1,8 @@
-# Tarteel · Qālūn recitation studio
+# Rattil · رَتِّل
+
+Learn to read and recite the Quran in the Qālūn riwāyah, from the first letter to
+whole surahs. The name comes from 73:4, *wa rattili l-qurʾāna tartīlā*: “and recite
+the Quran with measured care.”
 
 A green-and-white Next.js presentation interface connected to the local full
 Whisper model in `runs/gpu_base_full`. Includes live microphone streaming and a

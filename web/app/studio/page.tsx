@@ -109,7 +109,7 @@ export default function Home() {
 
   return <div className="app-shell">
     <aside className="rail" aria-label="Primary navigation">
-      <a href="/" className="brand-symbol" aria-label="Tarteel home"><Ornament small /></a>
+      <a href="/" className="brand-symbol" aria-label="Rattil home"><Ornament small /></a>
       <div className="rail-divider" />
       <button className="rail-button selected" title="Recitation workspace" aria-label="Recitation workspace"><BookOpen size={21} /></button>
       <a className="rail-button" href="/learn" title="Learn to read" aria-label="Learn to read"><GraduationCap size={21} /></a>
@@ -120,7 +120,7 @@ export default function Home() {
 
     <div className="workspace">
       <header className="topbar">
-        <a className="wordmark" href="/">tarteel<span>ترتيل</span></a>
+        <a className="wordmark" href="/">rattil<span>رَتِّل</span></a>
         <nav className="topnav" aria-label="Workspace"><a href="/learn">Learn to read</a><span className="topnav-active">Recitation studio</span><button onClick={() => setHelp(true)}>How it works <ArrowRight size={14} /></button></nav>
         <div className="topbar-right"><span className="local-pill"><span /> Local & private</span><button className="icon-button" title="Presentation fullscreen" aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"} onClick={toggleFullscreen}><Expand size={18} /></button></div>
       </header>

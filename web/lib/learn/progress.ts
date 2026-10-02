@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 export type LessonRecord = { done: boolean; accuracy: number; xp: number; at: string };
 export type Progress = { lessons: Record<string, LessonRecord>; xp: number; days: string[] };
 
-const KEY = "tarteel.learn.v1";
+const KEY = "rattil.learn.v1";
 const empty: Progress = { lessons: {}, xp: 0, days: [] };
 
 function read(): Progress {

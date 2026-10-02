@@ -115,7 +115,7 @@ const STRINGS = {
 } as const;
 
 export type StringKey = keyof typeof STRINGS.en;
-const KEY = "tarteel.lang";
+const KEY = "rattil.lang";
 const LangContext = createContext<{ lang: Lang; t: (key: StringKey) => string; toggle: () => void }>({
   lang: "en", t: key => STRINGS.en[key], toggle: () => undefined,
 });
