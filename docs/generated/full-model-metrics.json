@@ -1,0 +1,49 @@
+{
+  "source": "runs\\gpu_base_full\\test_predictions.jsonl",
+  "metric_units": "fractions",
+  "fresh_evaluation": false,
+  "samples": 232,
+  "wer": 0.2638888888888889,
+  "cer": 0.07957244655581948,
+  "word_substitutions": 212,
+  "word_deletions": 30,
+  "word_insertions": 24,
+  "reference_words": 1008,
+  "per_reader": {
+    "dokali": {
+      "samples": 58,
+      "wer": 0.3253968253968254,
+      "cer": 0.11718131433095803
+    },
+    "husary": {
+      "samples": 58,
+      "wer": 0.2777777777777778,
+      "cer": 0.07521773555027712
+    },
+    "huthaify": {
+      "samples": 58,
+      "wer": 0.20634920634920634,
+      "cer": 0.05304829770387965
+    },
+    "waleed": {
+      "samples": 58,
+      "wer": 0.24603174603174602,
+      "cer": 0.0728424386381631
+    }
+  },
+  "cluster_bootstrap": {
+    "unit": "ayah",
+    "groups": 58,
+    "replicates": 1000,
+    "seed": 42,
+    "wer_95_interval": [
+      0.20341303251338558,
+      0.33057908991475543
+    ],
+    "cer_95_interval": [
+      0.059920529291418265,
+      0.10246027772603081
+    ],
+    "warning": "Descriptive interval for this saved split; does not establish unseen-reader generalization. Four expert voices are insufficient for a strong population estimate."
+  }
+}

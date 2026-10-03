@@ -49,10 +49,16 @@ def evaluate_rows(model, processor, rows, batch_size=1,
             details.append({"surah": row["surah"], "ayah": row["ayah"],
                             "reciter": row["reciter_key"],
                             "reference": normalizer(row[label_field]),
-                            "prediction": normalizer(prediction)})
+                             "prediction": normalizer(prediction)})
+            if "text_seen_in_training" in row:
+                details[-1]["text_seen_in_training"] = row["text_seen_in_training"]
     report = {"overall": _scores(details)}
     for reciter in sorted({row["reciter"] for row in details}):
         report[reciter] = _scores([row for row in details if row["reciter"] == reciter])
+    for seen in (True, False):
+        stratum = [row for row in details if row.get("text_seen_in_training") is seen]
+        if stratum:
+            report["seen_text" if seen else "unseen_text"] = _scores(stratum)
     if label_field == "text_asr_normalized":
         # Diagnostic only: do not rewrite training targets to force extra hamza folding.
         def without_hamza(value):

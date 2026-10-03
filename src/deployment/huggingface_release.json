@@ -1,0 +1,61 @@
+{
+  "repo_id": "BadrSh/qalon-reciter",
+  "commit": "4072f87644d863f085fe86417c8d371dc84ac1cc",
+  "url": "https://huggingface.co/BadrSh/qalon-reciter/commit/4072f87644d863f085fe86417c8d371dc84ac1cc",
+  "metrics": {
+    "verified_at": "2026-10-02T23:16:58.374704+00:00",
+    "metric_units": "fractions (0-1)",
+    "verified_from_saved_predictions": true,
+    "models": {
+      "full-finetuning": {
+        "validation": {
+          "samples": 188,
+          "wer": 0.2874331550802139,
+          "cer": 0.07199367088607594
+        },
+        "test": {
+          "samples": 232,
+          "wer": 0.2638888888888889,
+          "cer": 0.07957244655581948
+        }
+      },
+      "base-lora-v2": {
+        "validation": {
+          "samples": 188,
+          "wer": 0.3302139037433155,
+          "cer": 0.10100210970464135
+        },
+        "test": {
+          "samples": 232,
+          "wer": 0.3115079365079365,
+          "cer": 0.09045922406967538
+        }
+      }
+    }
+  },
+  "artifact_sha256": {
+    "models/full-finetuning/added_tokens.json": "8a5856a00b438f6fc40d2c6d9d93fea54f2c169bdc817a58d1feddb9ac96302e",
+    "models/full-finetuning/config.json": "84478bc2dac36ae1d16c8ca8b58341beb35cb63d561793fd4ed8541f22154366",
+    "models/full-finetuning/generation_config.json": "0adb1b5bd0f1b350187356e2008c462f917ef871bb6a3b70683906838c3cf7b5",
+    "models/full-finetuning/merges.txt": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+    "models/full-finetuning/metrics.json": "0a527c533e8fa77273a1f40251f91ed88db12b1cd20d2282c4a9b37c7a6266e5",
+    "models/full-finetuning/model.safetensors": "eb6abac6d6b7ca0491bd843459ef70a2cc35620bd1cf96a9ce8e233eabeebbf5",
+    "models/full-finetuning/normalizer.json": "6c40cc36b4bb9c5aa8be0ff9023ea4e78a3ab718b3490a1d9cd3cb7ec56f130f",
+    "models/full-finetuning/preprocessor_config.json": "e4449dfed25a2b4c054b6103753daebad3cfab42c1ac0421b3e5c621a4de22e1",
+    "models/full-finetuning/special_tokens_map.json": "aa84bd013194e2bf2450397e49e656d8b8d9e1f971c0f1702409870b2cf14106",
+    "models/full-finetuning/tokenizer.json": "daf5676f2d06c39fab5e2c1fb4d15d086e271d7af3212ba8ffb496c4be013b74",
+    "models/full-finetuning/tokenizer_config.json": "f46e9819a8910572da1b528afde146a56c63068e1a130ffc66f7b5315093b0e1",
+    "models/full-finetuning/vocab.json": "8f680bba319e01a653d2e8a5dbc17a9157179e0576e6ce74ce0c06356c6e24f9",
+    "models/base-lora-v2/adapter_config.json": "97c98906585a871af26fa620576f21bee3b49edaf65d0348669cf6b58d44ecb7",
+    "models/base-lora-v2/adapter_model.safetensors": "e61888975bbafc479e89fed6974ea1717ee48b3ec1c604f38f709bcb4c657b1f",
+    "models/base-lora-v2/added_tokens.json": "8a5856a00b438f6fc40d2c6d9d93fea54f2c169bdc817a58d1feddb9ac96302e",
+    "models/base-lora-v2/merges.txt": "2df2990a395e35e8dfbc7511e08c12d56018d8d04691e0133e5d63b21e154dc6",
+    "models/base-lora-v2/metrics.json": "6abce58f5c32e1a421aab92d338fbc7699d0e5fd5e80795db7d5a9f8ab700512",
+    "models/base-lora-v2/normalizer.json": "6c40cc36b4bb9c5aa8be0ff9023ea4e78a3ab718b3490a1d9cd3cb7ec56f130f",
+    "models/base-lora-v2/preprocessor_config.json": "e4449dfed25a2b4c054b6103753daebad3cfab42c1ac0421b3e5c621a4de22e1",
+    "models/base-lora-v2/special_tokens_map.json": "aa84bd013194e2bf2450397e49e656d8b8d9e1f971c0f1702409870b2cf14106",
+    "models/base-lora-v2/tokenizer.json": "daf5676f2d06c39fab5e2c1fb4d15d086e271d7af3212ba8ffb496c4be013b74",
+    "models/base-lora-v2/tokenizer_config.json": "f46e9819a8910572da1b528afde146a56c63068e1a130ffc66f7b5315093b0e1",
+    "models/base-lora-v2/vocab.json": "8f680bba319e01a653d2e8a5dbc17a9157179e0576e6ce74ce0c06356c6e24f9"
+  }
+}

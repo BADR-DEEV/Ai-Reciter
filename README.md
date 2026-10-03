@@ -40,6 +40,8 @@ green matches, a red omission, gray unreached ayahs, and uninterrupted progressi
 The demo is not a claim about measured model performance.
 
 For a production presentation build: `npm run build`, then `npm start` in `web`.
+Stop `npm run dev` first; do not run development and production builds against
+the same `.next` directory simultaneously.
 The app and API bind to loopback by default. `/health` on port 8000 reports the
 loaded model, CUDA/CPU device, and active sessions.
 
@@ -85,10 +87,15 @@ assets without enriching datasets. Adding geometry does not retrain the model.
    local Whisper decoding around every 1.2 seconds (actual latency depends on GPU).
    Simple RMS activity detection suppresses silence decoding; a quiet boundary
    triggers a final decode. Receive and inference tasks run independently.
-3. The selected surah’s first ayah initializes the **matcher context**, not a
+   Utterance context is preserved across early ayah transitions; strongly
+   aligned completed text is removed from retained-window matching, avoiding
+   tiny cropped terminal tails being interpreted as the next ayah.
+   An isolated first word after an ayah transition may stay pending until a
+   second target-word anchor corroborates it; its audio is retained meanwhile.
+3. The selected starting ayah initializes the **matcher context**, not a
    decoder prompt. Expected text is never fed into Whisper to inflate scores.
 4. Ordered, one-to-one fuzzy word matching gives a **text agreement score**.
-   Each recognized reference word becomes **green** individually, without
+   Each corroborated reference word becomes **green** individually, without
    waiting for an ayah to reach 65%. Words skipped before later recognized words
    become **red** after two consistent observations or a voiced boundary; future
    words remain **gray**, including when you pause partway through an ayah.
@@ -116,7 +123,39 @@ an expected word absent from the matched transcript, not proof of an acoustic
 omission; ASR errors can still produce false alerts. Demo mode now animates words,
 including one simulated within-ayah omission.
 
-## Configuration
+## Learning challenges, local profiles and Qālūn phonetics
+
+- `/games`: next-ayah recall (blind local AI transcription or choices), match
+  three real Qālūn audio clips, identify a surah, restore a word, and order ayahs.
+  Choose difficulty and Fātiḥah/Juz ʿAmma or whole-Quran text scope.
+- `/profile`: name + **demo password** stored only as a salted PBKDF2 hash in
+  localStorage, with per-profile progress. This is not real authentication;
+  never reuse a real password. No cloud sync or recovery.
+- Studio: choose a starting/resume ayah and enable **draft Qālūn phonetics**.
+  The rules use the vocalized Qālūn source, not copied Hafs Latin text.
+  No entries are claimed scholar-approved. Read the audit before teaching.
+- Meaning/tafsir: Arabic tafsir and English **translation of meanings** from
+  Quran Tafseer API, behind a server-side proxy with numbering alignment,
+  attribution and failure handling. Only opening the panel triggers lookup.
+  Commentary is not a replacement riwāyah-specific recitation text.
+
+Generate the acoustic distractor index (565 aligned clips in this dataset):
+
+```powershell
+python src/learning/build_audio_similarity.py
+cd web
+npm.cmd run phonetics:audit
+```
+
+Local audio quizzes need the existing Al-Husary dataset; no Hafs recordings are
+substituted. Without the generated index, difficulty explicitly falls back to
+text similarity. MFCC similarity is a heuristic, not a phoneme/tajweed model.
+
+Analysis and next priorities: [`docs/ACCURACY_AND_PRODUCT_PLAN.md`](docs/ACCURACY_AND_PRODUCT_PLAN.md).
+Phonetics review guide: [`docs/QALOON_PHONETICS_AUDIT.md`](docs/QALOON_PHONETICS_AUDIT.md).
+Full generated spreadsheet: `docs/generated/qaloon-phonetics-audit.csv`.
+
+## Service configuration
 
 - `RECITER_MODEL_PATH`: full local model directory (default `runs/gpu_base_full`).
 - `RECITER_ALLOWED_ORIGINS`: comma-separated allowed UI origins; defaults to
@@ -145,7 +184,10 @@ Replay needs mono 16 kHz PCM16 WAV files and sends them at real microphone speed
 Matching unit tests cover ordered duplicate words, partial green without advancing,
 terminal-word stability, incorrect terminal words, omissions, multi-ayah decoding,
 and Fātiḥah’s unnumbered basmalah. Browser tests cover asset loading, surah selection,
-demo/reset behavior, help, and mobile overflow.
+demo/reset behavior, help, mobile overflow, phonetic rule fixtures, five challenge
+modes, hashed local profiles with isolated progress, and bilingual commentary.
+The streaming regression suite also covers retained audio/context, tentative
+boundary words, worker failures, starting-ayah validation and heartbeat handling.
 The opt-in microphone-to-GPU browser test uses `RECITER_LIVE_TEST_AUDIO`, an absolute
 WAV path containing Fātiḥah ayah 1 followed by ayah 3 (deliberately skipping 2).
 

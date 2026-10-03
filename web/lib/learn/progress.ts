@@ -1,17 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { PROFILE_EVENT, progressKey } from "../local-profile";
 
 // Per-browser progress. Storage can be unavailable (private windows, blocked
 // site data), so every access is guarded and the app works without it.
 export type LessonRecord = { done: boolean; accuracy: number; xp: number; at: string };
 export type Progress = { lessons: Record<string, LessonRecord>; xp: number; days: string[] };
 
-const KEY = "rattil.learn.v1";
 const empty: Progress = { lessons: {}, xp: 0, days: [] };
 
 function read(): Progress {
-  try { return { ...empty, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; }
+  try { return { ...empty, ...JSON.parse(localStorage.getItem(progressKey()) || "{}") }; }
   catch { return empty; }
 }
 
@@ -29,22 +29,26 @@ export function streak(days: string[]) {
 export function useProgress() {
   const [progress, setProgress] = useState<Progress>(empty);
   const [loaded, setLoaded] = useState(false);
-  useEffect(() => { setProgress(read()); setLoaded(true); }, []);
+  useEffect(() => {
+    const refresh = () => { setProgress(read()); setLoaded(true); };
+    refresh(); window.addEventListener(PROFILE_EVENT, refresh); window.addEventListener("storage", refresh); window.addEventListener("rattil:progress", refresh);
+    return () => { window.removeEventListener(PROFILE_EVENT, refresh); window.removeEventListener("storage", refresh); window.removeEventListener("rattil:progress", refresh); };
+  }, []);
 
   const complete = useCallback((id: string, accuracy: number, xp: number) => {
     const current = read();
     const previous = current.lessons[id];
     const next: Progress = {
       lessons: { ...current.lessons, [id]: { done: true, accuracy: Math.max(accuracy, previous?.accuracy || 0), xp: Math.max(xp, previous?.xp || 0), at: new Date().toISOString() } },
-      xp: current.xp + xp,
+      xp: current.xp + Math.max(0, xp - (previous?.xp || 0)),
       days: [...new Set([...current.days, today()])].slice(-120),
     };
-    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* Progress is a convenience. */ }
+    try { localStorage.setItem(progressKey(), JSON.stringify(next)); window.dispatchEvent(new Event("rattil:progress")); } catch { /* Progress is a convenience. */ }
     setProgress(next);
   }, []);
 
   const resetAll = useCallback(() => {
-    try { localStorage.removeItem(KEY); } catch { /* Nothing stored. */ }
+    try { localStorage.removeItem(progressKey()); window.dispatchEvent(new Event("rattil:progress")); } catch { /* Nothing stored. */ }
     setProgress(empty);
   }, []);
 

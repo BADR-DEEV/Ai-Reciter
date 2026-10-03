@@ -4,6 +4,7 @@ This is transcript agreement, not acoustic correctness or a tajweed judgment.
 The expected text is never supplied as a Whisper decoder prompt.
 """
 from difflib import SequenceMatcher
+from functools import lru_cache
 from pathlib import Path
 import sys
 
@@ -11,8 +12,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dataset_collection
 from qaloon_audio2text import normalize_quran_for_asr
 
 
+@lru_cache(maxsize=512)
+def _words(text):
+    return tuple(normalize_quran_for_asr(text).split())
+
+
 def words(text):
-    return normalize_quran_for_asr(text).split()
+    return list(_words(text))
 
 
 def alignment(expected, heard):
@@ -48,6 +54,9 @@ class RecitationTracker:
         self.last_partial = ""
         self.surah = surah
         self.omission_observations = {}
+        self.completed_context = []
+        self.tentative_prefix = False
+        self.has_advanced = False
 
     @property
     def done(self):
@@ -56,7 +65,8 @@ class RecitationTracker:
     def snapshot(self, transcript="", changed=False):
         return {"type": "update", "current": None if self.done else self.ayahs[self.index]["ayah"],
                 "results": self.results.copy(), "transcript": transcript,
-                "complete": self.done, "advanced": changed, "threshold": self.threshold}
+                "complete": self.done, "advanced": changed, "threshold": self.threshold,
+                "tentative_prefix": self.tentative_prefix}
 
     def evaluate(self, index, heard):
         expected = words(self.ayahs[index]["normalized"])
@@ -99,7 +109,11 @@ class RecitationTracker:
             results.append(word)
         return results
 
-    def feed(self, transcript, final=False):
+    def clear_context(self):
+        self.completed_context = []
+
+    def feed(self, transcript, final=False, continuous=False):
+        self.tentative_prefix = False
         if self.done:
             return self.snapshot(transcript)
         heard = words(transcript)
@@ -107,6 +121,17 @@ class RecitationTracker:
             intro = words("بسم الله الرحمن الرحيم")
             if heard[:len(intro)] == intro:
                 heard = heard[len(intro):]
+        original = heard[:]
+        consumed = 0
+        if continuous and self.completed_context:
+            context_pairs = alignment(self.completed_context, heard)
+            # Retained audio can re-decode completed ayahs. Remove only a
+            # strongly aligned context ending, never an arbitrary shared word.
+            if (len(context_pairs) >= min(2, len(self.completed_context))
+                    and len(context_pairs) / len(self.completed_context) >= 0.8
+                    and context_pairs[-1][0] == len(self.completed_context) - 1):
+                consumed = context_pairs[-1][1] + 1
+                heard = heard[consumed:]
         if not heard:
             return self.snapshot(transcript)
         self.last_partial = transcript
@@ -117,10 +142,15 @@ class RecitationTracker:
             target = self.index
             # A silent gap does not mean a skipped ayah. Only a strong later
             # verse match can advance past an omission; bounded lookahead.
-            if score < self.threshold:
+            # A high partial match with a mistranscribed final word used to
+            # disable lookahead forever. Strong later-ayah evidence can recover
+            # without inventing a terminal match or changing blind ASR output.
+            if not terminal or score < self.threshold:
                 for candidate in range(self.index + 1, min(self.index + 4, len(self.ayahs))):
                     other, other_terminal, other_end, other_missing, other_pairs = self.evaluate(candidate, heard)
-                    if other >= self.threshold and other > score + 0.2:
+                    ordered_later = (other_terminal and len(other_pairs) >= 2
+                                     and other_pairs[0][1] > max((j for _, j in pairs), default=-1))
+                    if other >= self.threshold and (other > score + 0.2 or ordered_later):
                         target, score, terminal, end, missing = candidate, other, other_terminal, other_end, other_missing
                         pairs = other_pairs
             evidence = (target, terminal, end)
@@ -144,6 +174,17 @@ class RecitationTracker:
                                                   "words": word_results}
                 self.index = target
                 changed = True
+                self.has_advanced = True
+            # Whisper can hallucinate a single next-verse word at an utterance
+            # tail. With retained completed context, require two target-word
+            # anchors before first committing that new verse. Keep its PCM as
+            # tentative; a genuine continued prefix can still be corroborated.
+            previous = self.results.get(self.ayahs[self.index]["ayah"], {})
+            if (continuous and self.has_advanced and len(pairs) == 1
+                    and len(words(self.ayahs[self.index]["normalized"])) > 1
+                    and not any(w["status"] == "correct" for w in previous.get("words", []))):
+                self.tentative_prefix = True
+                break
             # Whisper can emit a lone word from the trailing breath/silence of
             # the previous ayah. This is not evidence the next ayah was reached.
             if score == 0 and not (final and len(heard) >= 3):
@@ -157,6 +198,11 @@ class RecitationTracker:
                 self.results[ayah].update(status="correct" if score >= self.threshold else "missed", final=True)
                 self.index += 1
                 changed = True
+                self.has_advanced = True
+                consumed += end + 1
+                if continuous:
+                    # Bound matcher history to the rolling ASR context.
+                    self.completed_context = original[:consumed][-80:]
                 heard = heard[end + 1:]
                 self.last_candidate, self.stability = None, 0
             else:

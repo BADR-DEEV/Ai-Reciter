@@ -5,6 +5,9 @@ import { ArrowDown, ArrowRight, BookOpen, GraduationCap, Check, CheckCircle2, Ch
 import type { Manifest, Surah } from "@/lib/types";
 import { useRecitation } from "@/lib/use-recitation";
 import { AyahWords } from "@/components/ayah-words";
+import { PhoneticAid } from "@/components/phonetic-aid";
+import { TafsirPanel } from "@/components/tafsir-panel";
+import { ServiceStatus } from "@/components/service-status";
 
 function Ornament({ small = false }: { small?: boolean }) {
   return <span className={`ornament ${small ? "small" : ""}`} aria-hidden="true"><span>✦</span></span>;
@@ -24,7 +27,9 @@ export default function Home() {
   const [fullscreen, setFullscreen] = useState(false);
   const textReader = useRef<HTMLDivElement>(null);
   const audioInput = useRef<HTMLInputElement>(null);
-  const recitation = useRecitation(surah);
+  const [startAyah, setStartAyah] = useState(1);
+  const [showPhonetics, setShowPhonetics] = useState(false);
+  const recitation = useRecitation(surah, startAyah);
   const active = ["connecting", "listening", "stopping"].includes(recitation.state);
 
   useEffect(() => {
@@ -66,7 +71,7 @@ export default function Home() {
 
   const pages = useMemo(() => [...new Set(surah?.ayahs.flatMap(a => a.regions.map(r => r.page)) || [])], [surah]);
   const results = recitation.update?.results || {};
-  const current = recitation.update?.current ?? (recitation.state === "complete" ? null : surah?.ayahs[0]?.ayah);
+  const current = recitation.update?.current ?? (recitation.state === "complete" ? null : startAyah);
   const currentAyah = surah?.ayahs.find(a => a.ayah === current);
   const finalized = Object.values(results).filter(r => r.final);
   const wordResults = Object.values(results).flatMap(result => result.words || []);
@@ -105,7 +110,7 @@ export default function Home() {
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); }
     catch { /* Fullscreen is optional in embedded browsers. */ }
   };
-  const selectSurah = (id: number) => { recitation.reset(); setSelected(id); setPicker(false); setQuery(""); };
+  const selectSurah = (id: number) => { recitation.reset(); setStartAyah(1); setSelected(id); setPicker(false); setQuery(""); };
 
   return <div className="app-shell">
     <aside className="rail" aria-label="Primary navigation">
@@ -121,7 +126,7 @@ export default function Home() {
     <div className="workspace">
       <header className="topbar">
         <a className="wordmark" href="/">rattil<span>رَتِّل</span></a>
-        <nav className="topnav" aria-label="Workspace"><a href="/learn">Learn to read</a><span className="topnav-active">Recitation studio</span><button onClick={() => setHelp(true)}>How it works <ArrowRight size={14} /></button></nav>
+        <nav className="topnav" aria-label="Workspace"><a href="/learn">Learn to read</a><a href="/games">Challenges</a><a href="/profile">Profile</a><span className="topnav-active">Recitation studio</span><button onClick={() => setHelp(true)}>How it works <ArrowRight size={14} /></button></nav>
         <div className="topbar-right"><span className="local-pill"><span /> Local & private</span><button className="icon-button" title="Presentation fullscreen" aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"} onClick={toggleFullscreen}><Expand size={18} /></button></div>
       </header>
 
@@ -140,6 +145,8 @@ export default function Home() {
         {(loadError || recitation.error) && <div className="error-message" role="alert">{loadError || recitation.error}</div>}
         {surah && !surah.trained && <div className="notice"><CircleHelp size={16} /> This surah is available to read, but lies outside the model’s training coverage. Live matching is experimental.</div>}
         {recitation.demo && <div className="demo-banner"><Sparkles size={16} /><strong>Presentation demo</strong> Simulated word-by-word results, including an omitted word and a missed ayah. No microphone or model inference.</div>}
+        <section className="reading-tools"><label>Start / resume from ayah <select aria-label="Starting ayah" disabled={active} value={startAyah} onChange={e => setStartAyah(Number(e.target.value))}>{surah?.ayahs.map(a => <option key={a.ayah} value={a.ayah}>{a.ayah}</option>)}</select></label>
+          <label><input type="checkbox" checked={showPhonetics} onChange={e => setShowPhonetics(e.target.checked)} /> Show draft Qālūn phonetics</label><span role="status">{recitation.connection}</span></section>
 
         <div className="studio-grid">
           <section className="mushaf-card" aria-label="Quran reader">
@@ -159,7 +166,7 @@ export default function Home() {
                     return <polygon key={`${ayah.ayah}-${index}`} points={region.polygon} className={`ayah-region ${status}`}><title>Ayah {ayah.ayah}: {status}{result ? ` · ${Math.round(result.score * 100)}% text agreement` : ""}</title></polygon>;
                   }))}
                 </svg>
-              </div> : <div className="text-mushaf word-mode" ref={textReader} lang="ar" dir="rtl">{surah?.ayahs.map(ayah => <span key={ayah.ayah} data-ayah={ayah.ayah} className={`text-ayah ${results[ayah.ayah]?.status || (ayah.ayah === current && active ? "listening" : "pending")}`}><AyahWords ayah={ayah} result={results[ayah.ayah]} /><span className="ayah-medallion">{ayah.ayah.toLocaleString("ar")}</span> </span>)}</div>}
+              </div> : <div className="text-mushaf word-mode" ref={textReader} lang="ar" dir="rtl">{surah?.ayahs.map(ayah => <div key={ayah.ayah} data-ayah={ayah.ayah} className={`text-ayah ${results[ayah.ayah]?.status || (ayah.ayah === current && active ? "listening" : "pending")}`}><AyahWords ayah={ayah} result={results[ayah.ayah]} /><span className="ayah-medallion">{ayah.ayah.toLocaleString("ar")}</span>{showPhonetics && <PhoneticAid text={ayah.text} />}</div>)}</div>}
               {mode === "mushaf" && <p className="geometry-note">Switch to Ayah view for individual heard and omitted word colors.</p>}
               {surah && !surah.preciseGeometry && <p className="geometry-note">Qālūn ayah divisions differ from this page artwork. Live highlighting uses Ayah view.</p>}
               {surah?.ayahs.some(a => !a.regions.length) && mode === "mushaf" && <p className="geometry-note">Some ayahs have no API polygon. Use Ayah view for complete text.</p>}
@@ -169,6 +176,7 @@ export default function Home() {
           </section>
 
           <aside className="session-panel">
+            <ServiceStatus />
             <section className="listening-card"><div className="panel-heading"><span><span className="status-dot" /> {recitation.state === "complete" ? "SESSION COMPLETE" : active ? "LIVE RECITATION" : "RECITATION COMPANION"}</span><Headphones size={17} /></div>
               <div className={`mic-orbit ${recitation.state === "listening" ? "is-listening" : ""}`}><div className="orbit-ring" /><div className="mic-core">{recitation.state === "complete" ? <Check size={31} /> : <Mic size={29} />}</div><span className="orbit-star">✦</span></div>
               <h2>{recitation.state === "connecting" ? "Connecting to your model…" : recitation.state === "stopping" ? "Finishing your recitation…" : recitation.state === "complete" ? "A beautiful step forward." : recitation.state === "listening" ? "We’re listening." : "Your voice. Your journey."}</h2>
@@ -187,6 +195,7 @@ export default function Home() {
             <section className="current-card"><div className="section-heading"><h3>{recitation.state === "complete" ? "Session reflection" : "Your place"}</h3><span className="mini-pill">{current ? `Ayah ${current}` : "Complete"}</span></div>{currentAyah ? <p lang="ar" dir="rtl" className="current-text"><AyahWords ayah={currentAyah} result={results[currentAyah.ayah]} /></p> : <p className="reflection-text">{heardWords} words matched. {omittedWords ? `${omittedWords} to revisit gently.` : "May your practice bring you closer."}</p>}<div className="current-hint"><ArrowDown size={14} /><span>{active ? "The last word moves you to the next ayah" : "Start with the first ayah, and follow your flow"}</span></div></section>
           </aside>
         </div>
+        {currentAyah && <TafsirPanel surah={selected} ayah={currentAyah.ayah} />}
 
         <section className="insight-row"><div className="insight-card"><span className="insight-icon"><Sparkles size={19} /></span><div><h3>Presence, not perfection.</h3><p>A missed ayah won’t interrupt you. Keep your flow, then come back with care.</p></div></div><div className="model-status"><span className="model-dot" /><div><strong>{recitation.demo ? "Simulated presentation" : "Whisper base · Qālūn"}</strong><span>{recitation.device === "cuda" ? "GPU connected" : recitation.device === "cpu" ? "CPU connected" : "Local model"} · 65% text-match threshold{agreement !== null ? ` · ${agreement}% session agreement` : ""}</span></div></div></section>
         {recitation.update?.transcript && <section className="transcript-card"><span className="field-label">{recitation.demo ? "SIMULATED TRANSCRIPT" : "WHAT THE MODEL HEARD"}</span><p lang="ar" dir="rtl">{recitation.update.transcript}</p>{recitation.update.latency_ms && <span className="decode-time">Last decode: {recitation.update.latency_ms} ms</span>}</section>}

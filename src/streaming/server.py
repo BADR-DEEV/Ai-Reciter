@@ -16,6 +16,7 @@ import torch
 from transformers import WhisperForConditionalGeneration, WhisperProcessor
 
 from .matcher import RecitationTracker
+from .buffer import after_advance
 from . import practice as lessons
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,6 +39,8 @@ class Engine:
         self.model = WhisperForConditionalGeneration.from_pretrained(
             str(MODEL_PATH), local_files_only=LOCAL_MODEL, torch_dtype=dtype).to(self.device).eval()
         self.lock = asyncio.Lock()
+        self.model.config.use_cache = True
+        self.last_latency_ms = None
 
     def transcribe(self, audio):
         inputs = self.processor(audio, sampling_rate=SAMPLE_RATE, return_tensors="pt", return_attention_mask=True)
@@ -117,7 +120,9 @@ async def practice(body: PracticeRequest, request: Request):
 @app.get("/health")
 def health():
     return {"ready": True, "device": app.state.engine.device, "model": MODEL_PATH.name,
-            "sample_rate": SAMPLE_RATE, "sessions": app.state.sessions}
+             "sample_rate": SAMPLE_RATE, "sessions": app.state.sessions,
+             "busy": app.state.engine.lock.locked(), "max_sessions": MAX_SESSIONS,
+             "last_latency_ms": app.state.engine.last_latency_ms}
 
 
 @app.websocket("/ws/recite")
@@ -141,9 +146,13 @@ async def recite(ws: WebSocket):
             raise ValueError("This surah has not been cached")
         data = json.loads(path.read_text(encoding="utf-8"))
         tracker = RecitationTracker(data["ayahs"], surah=surah)
+        start_ayah = config.get("start_ayah", data["ayahs"][0]["ayah"])
+        if type(start_ayah) is not int or not any(a["ayah"] == start_ayah for a in data["ayahs"]):
+            raise ValueError("Choose a valid starting ayah")
+        tracker.index = next(i for i, a in enumerate(data["ayahs"]) if a["ayah"] == start_ayah)
         engine = app.state.engine
         await ws.send_json({"type": "ready", "device": engine.device, "model": MODEL_PATH.name,
-                            "trained": data["trained"], "current": data["ayahs"][0]["ayah"]})
+                             "trained": data["trained"], "current": start_ayah})
         buffer = np.empty(0, dtype=np.float32)
         total = 0
         voiced_at = 0
@@ -151,9 +160,10 @@ async def recite(ws: WebSocket):
         final_voice_decoded = 0
         wake = asyncio.Event()
         stopping = False
+        transition_pending = False
 
         async def decode_loop():
-            nonlocal buffer, last_decoded, final_voice_decoded
+            nonlocal buffer, last_decoded, final_voice_decoded, transition_pending
             while not tracker.done:
                 try:
                     await asyncio.wait_for(wake.wait(), timeout=0.2)
@@ -186,14 +196,18 @@ async def recite(ws: WebSocket):
                 last_decoded = through
                 if final:
                     final_voice_decoded = voice_through
-                update = tracker.feed(transcript, final=final)
+                update = tracker.feed(transcript, final=final, continuous=True)
                 update["latency_ms"] = round((time.perf_counter() - start) * 1000)
+                engine.last_latency_ms = update["latency_ms"]
                 await ws.send_json(update)
-                if update["advanced"]:
+                if update["advanced"] or transition_pending:
                     # Preserve audio received during decoding. Do not erase the
                     # beginning of the next ayah while inference was running.
-                    pending = max(0, total - through)
-                    buffer = buffer[-pending:].copy() if pending else np.empty(0, dtype=np.float32)
+                    before = buffer
+                    buffer = after_advance(buffer, total, through, update, final=final)
+                    if buffer is not before:
+                        tracker.clear_context()
+                    transition_pending = not final
                 if stopping:
                     break
             await ws.send_json({**tracker.snapshot(tracker.last_partial), "type": "finished"})
@@ -201,7 +215,22 @@ async def recite(ws: WebSocket):
         worker = asyncio.create_task(decode_loop())
         started = time.monotonic()
         while not tracker.done:
-            message = await asyncio.wait_for(ws.receive(), timeout=60)
+            # Surface completion/errors immediately even if no new PCM arrives.
+            receive = asyncio.create_task(ws.receive())
+            try:
+                completed, _ = await asyncio.wait({receive, worker}, timeout=60,
+                                                   return_when=asyncio.FIRST_COMPLETED)
+                if worker in completed:
+                    await worker
+                    break
+                if receive not in completed:
+                    raise asyncio.TimeoutError
+                message = receive.result()
+            finally:
+                if not receive.done():
+                    receive.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await receive
             if message["type"] == "websocket.disconnect":
                 break
             if message.get("bytes") is not None:
@@ -221,6 +250,10 @@ async def recite(ws: WebSocket):
                 wake.set()
             elif message.get("text"):
                 control = json.loads(message["text"])
+                if control.get("type") == "ping":
+                    await ws.send_json({"type": "pong", "busy": engine.lock.locked(),
+                                        "audio_seconds": round(total / SAMPLE_RATE, 1),
+                                        "decoded_seconds": round(last_decoded / SAMPLE_RATE, 1)})
                 if control.get("type") == "stop":
                     stopping = True
                     wake.set()

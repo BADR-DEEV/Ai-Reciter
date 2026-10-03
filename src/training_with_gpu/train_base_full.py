@@ -11,8 +11,7 @@ import torchaudio.functional as F
 
 TRAINING_DIR = Path(__file__).resolve().parents[1] / "training"
 sys.path.insert(0, str(TRAINING_DIR))
-from qaloon_data import DATA_ROOT, RECITER_DIRS, load_splits
-from train_qaloon_lora import WhisperCollator
+from qaloon_data import DATA_ROOT, RECITER_DIRS, load_splits, speaker_disjoint_splits
 
 
 def parse_args():
@@ -30,6 +29,9 @@ def parse_args():
     p.add_argument("--gradient-accumulation", type=int, default=4)
     p.add_argument("--eval-batch-size", type=int, default=4)
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--validation-reciter", choices=RECITER_DIRS)
+    p.add_argument("--test-reciter", choices=RECITER_DIRS)
+    p.add_argument("--dry-run", action="store_true", help="Validate splits without loading a model or training")
     return p.parse_args()
 
 
@@ -70,7 +72,11 @@ class AugmentedAyahDataset:
             speed_factor = np.random.uniform(0.92, 1.08)
             audio_tensor = torch.from_numpy(audio).float()
             audio_tensor = F.resample(audio_tensor, int(sr * speed_factor), sr)
-            audio = audio_tensor.numpy()
+            candidate = audio_tensor.numpy()
+            # Slowing a 29s clip can make it >30s. Do not silently truncate its
+            # end while keeping the full transcript: reject that augmentation.
+            if len(candidate) <= sr * 30:
+                audio = candidate
 
         # 2. Mild Acoustic Noise (25 to 35 dB SNR)
         if self.noise_prob and np.random.random() < self.noise_prob:
@@ -87,10 +93,20 @@ class AugmentedAyahDataset:
 def main():
     args = parse_args()
     splits, skipped = load_splits(args.data_root, None, None, args.seed)
+    if bool(args.validation_reciter) != bool(args.test_reciter):
+        raise ValueError("Pass both --validation-reciter and --test-reciter for speaker-disjoint training")
+    if args.test_reciter:
+        splits = speaker_disjoint_splits(splits, args.validation_reciter, args.test_reciter)
     counts = {k: len(v) for k, v in splits.items()}
     print("Split counts:", counts, "Excluded >30s:", skipped)
+    print("Reciters:", {k: sorted({row["reciter_key"] for row in rows}) for k, rows in splits.items()})
+    if args.dry_run:
+        return
+    if (args.output_dir / "model.safetensors").exists():
+        raise ValueError("Choose a new output directory; refusing to overwrite an existing full model")
 
     from torch.utils.data import WeightedRandomSampler
+    from train_qaloon_lora import WhisperCollator
     from transformers import (EarlyStoppingCallback, Seq2SeqTrainer, Seq2SeqTrainingArguments,
                               WhisperForConditionalGeneration, WhisperProcessor)
 
@@ -128,7 +144,8 @@ def main():
         lr_scheduler_type="cosine",
         warmup_ratio=0.10,
         weight_decay=0.01,
-        bf16=True,
+        bf16=torch.cuda.is_bf16_supported(),
+        fp16=not torch.cuda.is_bf16_supported(),
         eval_strategy="epoch",
         save_strategy="epoch",
         save_total_limit=2,
@@ -157,13 +174,19 @@ def main():
     trainer.train()
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    model.config.use_cache = True
     model.save_pretrained(args.output_dir)
     processor.save_pretrained(args.output_dir)
     model.config.use_cache = True
 
     # Test evaluation
     from gpu_evaluation import evaluate_rows
-    result = {"model": model_id, "best_eval_loss": trainer.state.best_metric}
+    result = {"model": model_id, "best_eval_loss": trainer.state.best_metric, "seed": args.seed,
+              "label_field": args.label_field, "split_counts": counts,
+              "split_protocol": "speaker-disjoint" if args.test_reciter else "known-voice-unseen-ayah",
+              "validation_reciter": args.validation_reciter, "test_reciter": args.test_reciter,
+              "split_reciters": {k: sorted({r["reciter_key"] for r in rows}) for k, rows in splits.items()},
+              "augmentation": {"noise_prob": args.noise_prob, "speed_prob": args.speed_prob, "max_seconds": 30}}
     for split in ("validation", "test"):
         scores, details = evaluate_rows(model, processor, splits[split], args.eval_batch_size, args.label_field)
         result[split] = scores

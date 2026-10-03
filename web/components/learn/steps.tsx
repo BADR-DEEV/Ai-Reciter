@@ -9,6 +9,9 @@ import { playClip, speak, stopClip } from "@/lib/learn/speech";
 import { useLang } from "@/lib/i18n";
 import { Rich } from "./rich";
 import { SayPanel, speakText } from "./say-panel";
+import { PhoneticAid } from "@/components/phonetic-aid";
+import { TafsirPanel } from "@/components/tafsir-panel";
+import { qaloonG2P } from "@/lib/qaloon-g2p";
 
 const Listen = ({ text, label }: { text: string; label?: string }) =>
   <button className="btn-listen" onClick={() => speak(text)}><Volume2 size={17} /> {label || "Listen"}</button>;
@@ -115,14 +118,15 @@ export function AyahStep({ step, online, onScore }: { step: Extract<Step, { kind
   return <div className="step-ayah">
     <p className="ayah-ref">{surah.name} · Ayah {ayah.ayah}</p>
     <p className="ayah-text" lang="ar" dir="rtl">{ayah.text}</p>
-    <p className="ayah-translit">{ayah.translit}</p>
+    <PhoneticAid text={ayah.text} />
     <p className="ayah-meaning"><span>{t("meaning")}:</span> {ayah.meaning}</p>
     <button className="btn-listen" onClick={play}>
       {audio === "loading" ? <Loader2 className="spin" size={17} /> : audio === "playing" ? <Pause size={17} /> : <Mic2 size={17} />}
       {audio === "loading" ? "Loading recitation…" : audio === "playing" ? "Stop" : "Listen to Al-Husary"}
     </button>
     {audio === "failed" && <p className="say-error" role="alert">Couldn’t load the recitation. Check your internet connection and try again.</p>}
-    <SayPanel compact arabic={ayah.text} translit={ayah.translit} mode="reading" online={online} onScore={onScore} />
+    <SayPanel compact arabic={ayah.text} translit={qaloonG2P(ayah.text).text} mode="reading" online={online} onScore={onScore} />
+    <TafsirPanel surah={surah.id} ayah={ayah.ayah} />
   </div>;
 }
 

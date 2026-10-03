@@ -89,6 +89,33 @@ def audio_features(processor, path):
     return processor.feature_extractor(audio, sampling_rate=16000).input_features[0]
 
 
+def speaker_disjoint_splits(splits, validation_reciter, test_reciter):
+    """Fresh-training protocol: no held-out voice enters training.
+
+    Keep original ayah buckets on training speakers. Held-out validation/test
+    speakers use all their clips; caller must report seen/unseen text strata.
+    Never reinterpret already-trained four-speaker weights as speaker-held-out.
+    """
+    if validation_reciter == test_reciter or {validation_reciter, test_reciter} - RECITER_DIRS.keys():
+        raise ValueError("Choose two distinct, known held-out reciters")
+    rows = [row for partition in splits.values() for row in partition]
+    held_out = {validation_reciter, test_reciter}
+    result = {
+        "train": [row for row in splits["train"] if row["reciter_key"] not in held_out],
+        "validation": [row for row in rows if row["reciter_key"] == validation_reciter],
+        "test": [row for row in rows if row["reciter_key"] == test_reciter],
+    }
+    if any(not partition for partition in result.values()):
+        raise ValueError("Speaker holdout produced an empty partition")
+    speakers = [set(row["reciter_key"] for row in result[name]) for name in ("train", "validation", "test")]
+    if speakers[0] & speakers[1] or speakers[0] & speakers[2] or speakers[1] & speakers[2]:
+        raise ValueError("Speaker leakage detected")
+    training_texts = {row["text_asr_normalized"] for row in result["train"]}
+    for partition in ("validation", "test"):
+        result[partition] = [dict(row, text_seen_in_training=row["text_asr_normalized"] in training_texts) for row in result[partition]]
+    return result
+
+
 def score_predictions(references, hypotheses):
     from jiwer import cer, wer
 

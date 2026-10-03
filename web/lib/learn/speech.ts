@@ -29,11 +29,13 @@ function unlock() {
 function load(ctx: AudioContext, url: string) {
   let pending = buffers.get(url);
   if (!pending) {
-    pending = fetch(url)
+    pending = fetch(url, { signal: AbortSignal.timeout(20000) })
       .then(r => { if (!r.ok) throw new Error(`Audio ${r.status}`); return r.arrayBuffer(); })
       .then(data => ctx.decodeAudioData(data));
     pending.catch(() => buffers.delete(url));
     buffers.set(url, pending);
+    // Quiz navigation can touch hundreds of clips; bound decoded-audio memory.
+    if (buffers.size > 12) buffers.delete(buffers.keys().next().value!);
   }
   return pending;
 }

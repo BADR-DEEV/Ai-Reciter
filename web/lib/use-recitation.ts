@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Surah, Update } from "./types";
 
 type State = "idle" | "connecting" | "listening" | "stopping" | "complete";
-type Resources = { socket?: WebSocket; context?: AudioContext; stream?: MediaStream; node?: AudioWorkletNode; source?: AudioNode; playback?: AudioBufferSourceNode; timer?: ReturnType<typeof setInterval>; stopTimeout?: ReturnType<typeof setTimeout>; flushTimeout?: ReturnType<typeof setTimeout>; finishing?: boolean };
+type Resources = { socket?: WebSocket; context?: AudioContext; stream?: MediaStream; node?: AudioWorkletNode; source?: AudioNode; playback?: AudioBufferSourceNode; timer?: ReturnType<typeof setInterval>; heartbeat?: ReturnType<typeof setInterval>; stopTimeout?: ReturnType<typeof setTimeout>; flushTimeout?: ReturnType<typeof setTimeout>; finishing?: boolean };
 const endpoint = process.env.NEXT_PUBLIC_RECITER_WS || "ws://127.0.0.1:8000/ws/recite";
 
-export function useRecitation(surah: Surah | null) {
+export function useRecitation(surah: Surah | null, startAyah = 1) {
   const [state, setState] = useState<State>("idle");
   const [update, setUpdate] = useState<Update | null>(null);
   const [error, setError] = useState("");
@@ -16,6 +16,7 @@ export function useRecitation(surah: Surah | null) {
   const [device, setDevice] = useState("");
   const [demo, setDemo] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [connection, setConnection] = useState("Ready");
   const resources = useRef<Resources>({});
   const generation = useRef(0);
 
@@ -29,16 +30,17 @@ export function useRecitation(surah: Surah | null) {
     if (r.context && r.context.state !== "closed") void r.context.close();
     if (r.socket) { r.socket.onclose = null; r.socket.onmessage = null; r.socket.onerror = null; r.socket.onopen = null; r.socket.close(); }
     clearInterval(r.timer);
+    clearInterval(r.heartbeat);
     clearTimeout(r.stopTimeout);
     clearTimeout(r.flushTimeout);
   }, []);
 
   const reset = useCallback(() => {
     generation.current++;
-    release(); setState("idle"); setUpdate(null); setError(""); setLevel(0); setSeconds(0); setDemo(false); setDevice(""); setFileName("");
+    release(); setState("idle"); setUpdate(null); setError(""); setLevel(0); setSeconds(0); setDemo(false); setDevice(""); setFileName(""); setConnection("Ready");
   }, [release]);
 
-  useEffect(() => { reset(); return () => { generation.current++; release(); }; }, [surah?.id, reset, release]);
+  useEffect(() => { reset(); return () => { generation.current++; release(); }; }, [surah?.id, startAyah, reset, release]);
 
   const finish = useCallback(() => {
     const r = resources.current;
@@ -54,7 +56,7 @@ export function useRecitation(surah: Surah | null) {
     r.flushTimeout = setTimeout(() => {
       if (resources.current === r && r.socket?.readyState === WebSocket.OPEN) r.socket.send(JSON.stringify({ type: "stop" }));
     }, 250);
-    r.stopTimeout = setTimeout(() => { release(); setState("idle"); setError("Final decoding timed out. Your existing results are preserved."); }, 15000);
+    r.stopTimeout = setTimeout(() => { release(); setState("idle"); setError("Final decoding timed out. Your existing results are preserved. Choose a starting ayah to resume."); }, 45000);
   }, [release]);
 
   const start = useCallback(async (file?: File) => {
@@ -100,10 +102,11 @@ export function useRecitation(surah: Surah | null) {
       let ready = false;
       const timeout = setTimeout(() => { if (!ready && generation.current === token) { setError("The model service did not respond. Start the Python backend and try again."); release(); setState("idle"); } }, 15000);
       resources.current.stopTimeout = timeout;
-      socket.onopen = () => socket.send(JSON.stringify({ surah: surah.id }));
+      socket.onopen = () => socket.send(JSON.stringify({ surah: surah.id, start_ayah: startAyah }));
       socket.onmessage = event => {
         if (generation.current !== token) return;
-        const message = JSON.parse(event.data);
+        let message;
+        try { message = JSON.parse(event.data); } catch { setError("Invalid response from the model service."); release(); setState("idle"); return; }
         if (message.type === "ready") {
           ready = true; clearTimeout(timeout);
           if (resources.current.finishing) return;
@@ -112,7 +115,22 @@ export function useRecitation(surah: Surah | null) {
           void context.resume();
           if (source instanceof AudioBufferSourceNode) source.start();
           resources.current.timer = setInterval(() => setSeconds(value => value + 1), 1000);
+          let lastResponse = Date.now();
+          const original = socket.onmessage;
+          socket.onmessage = event => { lastResponse = Date.now(); original?.call(socket, event); };
+          resources.current.heartbeat = setInterval(() => {
+            if (socket.readyState !== WebSocket.OPEN) return;
+            if (Date.now() - lastResponse > 20000) {
+              setError("The connection stopped responding. Results are preserved; resume from your starting ayah.");
+              release(); setState("idle"); return;
+            }
+            socket.send(JSON.stringify({ type: "ping" }));
+          }, 5000);
+        } else if (message.type === "pong") {
+          const lag = message.audio_seconds - message.decoded_seconds;
+          setConnection(lag > 8 && message.busy ? `Model catching up · ${Math.round(lag)}s pending` : message.busy ? "Decoding on device" : "Connected · waiting for speech");
         } else if (message.type === "update" || message.type === "finished") {
+          setConnection(`Last decode ${message.latency_ms || 0}ms`);
           setUpdate(message);
           if (message.complete || message.type === "finished") { release(); setLevel(0); setState(message.complete ? "complete" : "idle"); }
         } else if (message.type === "error") { setError(message.message); release(); setState("idle"); }
@@ -139,7 +157,7 @@ export function useRecitation(surah: Surah | null) {
       release(); setState("idle");
       setError(cause instanceof Error ? (cause.name === "NotAllowedError" ? "Microphone permission was denied. Allow access in your browser and try again." : cause.message) : "Could not start recording.");
     }
-  }, [surah, reset, release, finish]);
+  }, [surah, startAyah, reset, release, finish]);
 
   const stop = useCallback(() => {
     if (demo) { release(); setState("idle"); setLevel(0); return; }
@@ -172,5 +190,5 @@ export function useRecitation(surah: Surah | null) {
     }, 650);
   }, [surah, reset, release]);
 
-  return { state, update, error, level, seconds, device, demo, fileName, start, stop, reset, startDemo };
+  return { state, update, error, level, seconds, device, demo, fileName, connection, start, stop, reset, startDemo };
 }

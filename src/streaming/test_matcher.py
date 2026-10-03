@@ -8,6 +8,56 @@ def tracker(*texts):
 
 
 class MatcherTests(unittest.TestCase):
+    def test_retained_completed_context_does_not_mark_future_ayah(self):
+        t = tracker("الحمد لله رب العالمين", "الرحمن الرحيم", "ملك يوم الدين")
+        t.feed("الحمد لله رب العالمين", final=True, continuous=True)
+        update = t.feed("الحمد لله رب العالمين", final=True, continuous=True)
+        self.assertEqual(update["current"], 2)
+        self.assertNotIn(2, update["results"])
+        update = t.feed("الحمد لله رب العالمين ملك يوم الدين", final=True, continuous=True)
+        self.assertTrue(update["complete"])
+        self.assertTrue(all(w["status"] == "missed" for w in update["results"][2]["words"]))
+
+    def test_retained_next_ayah_prefix_and_final_can_complete(self):
+        t = tracker("قل هو الله احد", "الله الصمد")
+        update = t.feed("قل هو الله احد الله", final=True, continuous=True)
+        self.assertEqual(update["current"], 2)
+        self.assertTrue(update["tentative_prefix"])
+        self.assertNotIn(2, update["results"])
+        self.assertTrue(t.feed("قل هو الله احد الله الصمد", final=True, continuous=True)["complete"])
+
+    def test_uncorroborated_tail_not_preserved_as_a_green_omitted_word(self):
+        t = tracker("الحمد لله رب العالمين", "الرحمن الرحيم", "ملك يوم الدين")
+        update = t.feed("الحمد لله رب العالمين الرحمن", final=True, continuous=True)
+        self.assertTrue(update["tentative_prefix"])
+        self.assertNotIn(2, update["results"])
+        update = t.feed("الحمد لله رب العالمين الرحمن ملك يوم الدين", final=True, continuous=True)
+        self.assertTrue(update["complete"])
+        self.assertEqual([w["status"] for w in update["results"][2]["words"]], ["missed", "missed"])
+
+    def test_new_utterance_single_word_requires_corroboration_after_transition(self):
+        t = tracker("الحمد لله رب العالمين", "الرحمن الرحيم", "ملك يوم الدين")
+        t.feed("الحمد لله رب العالمين", final=True, continuous=True)
+        t.clear_context()
+        update = t.feed("الرحمن", final=True, continuous=True)
+        self.assertTrue(update["tentative_prefix"])
+        self.assertNotIn(2, update["results"])
+        update = t.feed("الرحمن الرحيم", final=True, continuous=True)
+        self.assertEqual(update["current"], 3)
+        self.assertEqual(update["results"][2]["status"], "correct")
+
+    def test_high_partial_match_can_recover_to_later_ayah(self):
+        t = tracker("الحمد لله رب العالمين", "الرحمن الرحيم")
+        t.feed("الحمد لله رب")
+        result = t.feed("الحمد لله رب الرحمن الرحيم", final=True)
+        self.assertTrue(result["complete"])
+        self.assertTrue(result["results"][1]["final"])
+        self.assertEqual(result["results"][1]["words"][-1]["status"], "missed")
+
+    def test_high_partial_does_not_advance_without_later_evidence(self):
+        t = tracker("الحمد لله رب العالمين", "الرحمن الرحيم")
+        self.assertEqual(t.feed("الحمد لله رب العالمون", final=True)["current"], 1)
+
     def test_order_and_duplicate_words(self):
         self.assertEqual(len(alignment(["الله", "الله"], ["الله"])), 1)
         self.assertLess(len(alignment(["قل", "هو", "الله"], ["الله", "هو", "قل"])), 3)
