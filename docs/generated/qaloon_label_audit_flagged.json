@@ -1,0 +1,422 @@
+{
+  "min_votes": 2,
+  "models": [
+    "tarteel=D:/islamicaich/models/whisper-base-ar-quran",
+    "deepdml=D:/islamicaich/models/whisper-base-ar-quran-mix-norm",
+    "naazim_turbo=D:/islamicaich/models/whisper-large-v3-turbo-ar-quran"
+  ],
+  "flagged_per_reciter": {
+    "dokali": "27/569",
+    "husary": "1/565",
+    "huthaify": "0/569"
+  },
+  "flagged": [
+    {
+      "key": "dokali:78:23",
+      "split": "train",
+      "label": "لابثين فيها احقابا",
+      "votes": [
+        "tarteel: insert at start",
+        "deepdml: insert at start"
+      ],
+      "heard": {
+        "tarteel": "الا بكين فيها احقابا",
+        "deepdml": "كلا بلين فيها احقابا",
+        "naazim_turbo": "ولابثين فيها احقابا"
+      }
+    },
+    {
+      "key": "dokali:79:17",
+      "split": "train",
+      "label": "اذهب الى فرعون انه طغى",
+      "votes": [
+        "tarteel: insert at end",
+        "deepdml: insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "اذهب الى فرعون انه طغى فقل هل لك الى ان تزكى",
+        "deepdml": "اذهب الى فرعون انه طغى فقل هل لك الى ان تزكى",
+        "naazim_turbo": "اذهب الى فرعون انه طغى فقل هل لك الى ان تزكى"
+      }
+    },
+    {
+      "key": "dokali:79:31",
+      "split": "train",
+      "label": "اخرج منها ماءها ومرعاها",
+      "votes": [
+        "deepdml: insert at start",
+        "naazim_turbo: insert at start"
+      ],
+      "heard": {
+        "tarteel": "اخرج منها ماءها ومرعاها",
+        "deepdml": "وما اخرج منها ماءها ومرعاها",
+        "naazim_turbo": "لا اخرج منها ماءها ومرعاها"
+      }
+    },
+    {
+      "key": "dokali:79:33",
+      "split": "train",
+      "label": "متاعا لكم ولانعامكم",
+      "votes": [
+        "tarteel: insert at start",
+        "deepdml: insert at start"
+      ],
+      "heard": {
+        "tarteel": "ما متاعا لكم ولانعامكم",
+        "deepdml": "ما متاعا لكم ولانعامكم",
+        "naazim_turbo": "متاعا لكم ولانعامكم"
+      }
+    },
+    {
+      "key": "dokali:80:25",
+      "split": "train",
+      "label": "ثم شققنا الارض شقا",
+      "votes": [
+        "tarteel: insert at end",
+        "deepdml: insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "ثم شققنا الارض شقا فانبتنا فيها حبا",
+        "deepdml": "ثم شققنا الارض شقا فانبتنا فيها حبا",
+        "naazim_turbo": "ثم شققنا الارض شقا فانبتنا فيها حبا"
+      }
+    },
+    {
+      "key": "dokali:80:30",
+      "split": "train",
+      "label": "وفاكهة وابا",
+      "votes": [
+        "tarteel: insert at start",
+        "deepdml: insert at start",
+        "naazim_turbo: insert at start"
+      ],
+      "heard": {
+        "tarteel": "واقرلبا وفاكهة وعبا",
+        "deepdml": "وايق غلبا وفاكهة وابى",
+        "naazim_turbo": "ولائق غلبا وفاكهة وابا"
+      }
+    },
+    {
+      "key": "dokali:81:10",
+      "split": "train",
+      "label": "واذا الصحف نشرت",
+      "votes": [
+        "tarteel: insert at end",
+        "deepdml: insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "واذا الصحف نشرت واذا السماء كشطت",
+        "deepdml": "واذا الصحف نشرت واذا السماء كشطت",
+        "naazim_turbo": "واذا الصحف نشرت واذا السماء كشطت"
+      }
+    },
+    {
+      "key": "dokali:81:19",
+      "split": "train",
+      "label": "انه لقول رسول كريم",
+      "votes": [
+        "tarteel: insert at end",
+        "deepdml: insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "فانه لقول رسول كريم ذي قوة",
+        "deepdml": "فانه لقول رسول كريم ذي قوة",
+        "naazim_turbo": "انه لقول رسول كريم ذي قوة"
+      }
+    },
+    {
+      "key": "dokali:85:5",
+      "split": "train",
+      "label": "النار ذات الوقود",
+      "votes": [
+        "tarteel: insert at start",
+        "deepdml: insert at start",
+        "naazim_turbo: insert at start"
+      ],
+      "heard": {
+        "tarteel": "قتل اصحاب الاخدود النار ذات الوقود",
+        "deepdml": "قتل اصحاب الاخدود النار ذات الوقود",
+        "naazim_turbo": "قتل اصحاب الاخدود النار ذات الوقود"
+      }
+    },
+    {
+      "key": "dokali:89:22",
+      "split": "train",
+      "label": "وتحبون المال حبا جما",
+      "votes": [
+        "tarteel: insert at start",
+        "deepdml: insert at start",
+        "naazim_turbo: insert at start"
+      ],
+      "heard": {
+        "tarteel": "والى اللمن وتحبون المال عبا جما",
+        "deepdml": "كلا لما وتحبون المال حبا جما",
+        "naazim_turbo": "وللما وتحبون المال حبا جما"
+      }
+    },
+    {
+      "key": "dokali:96:16",
+      "split": "train",
+      "label": "لنسفعا بالناصية",
+      "votes": [
+        "tarteel: insert at start",
+        "deepdml: insert at start"
+      ],
+      "heard": {
+        "tarteel": "ويل نشفعا بالنعصية",
+        "deepdml": "قيل نشف عنه بالناصية",
+        "naazim_turbo": "لنسفعا بالناصية"
+      }
+    },
+    {
+      "key": "dokali:100:5",
+      "split": "train",
+      "label": "فوسطن به جمعا",
+      "votes": [
+        "deepdml: insert at start",
+        "naazim_turbo: insert at start"
+      ],
+      "heard": {
+        "tarteel": "فوصطن به جمعا",
+        "deepdml": "خذ نقم فوصطن به جمعا",
+        "naazim_turbo": "نقعا فوسطن به جمعا"
+      }
+    },
+    {
+      "key": "dokali:103:2",
+      "split": "train",
+      "label": "الا الذين ءامنوا وعملوا الصالحات وتواصوا بالحق",
+      "votes": [
+        "tarteel: delete at start",
+        "deepdml: insert at end"
+      ],
+      "heard": {
+        "tarteel": "الذين امنوا وعملوا الصالحات وتواصوا بالحق",
+        "deepdml": "الا الذين امنوا وعملوا الصالحات وتواصوا بالحق وتواص",
+        "naazim_turbo": "الا الذين امنوا وعملوا الصالحات وتواصوا بالحق"
+      }
+    },
+    {
+      "key": "dokali:106:3",
+      "split": "train",
+      "label": "فليعبدوا رب هذا البيت",
+      "votes": [
+        "tarteel: insert at end",
+        "deepdml: insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "فليعبدوا رب هذا البيت الذي",
+        "deepdml": "فليعبدوا رب هذا البيت الذي",
+        "naazim_turbo": "فليعبدوا رب هذا البيت الذي"
+      }
+    },
+    {
+      "key": "dokali:108:1",
+      "split": "train",
+      "label": "انا اعطيناك الكوثر",
+      "votes": [
+        "deepdml: insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "انا اعطيناك الكوسر",
+        "deepdml": "انا اعطيناك الكوثر فصل",
+        "naazim_turbo": "انا اعطيناك الكوثر فصدينا"
+      }
+    },
+    {
+      "key": "dokali:109:1",
+      "split": "train",
+      "label": "قل يا ايها الكافرون",
+      "votes": [
+        "tarteel: delete at start",
+        "deepdml: delete at start",
+        "naazim_turbo: delete at start"
+      ],
+      "heard": {
+        "tarteel": "يا ايها الكافرون",
+        "deepdml": "يا ايها الكافرون",
+        "naazim_turbo": "يا ايها الكافرون"
+      }
+    },
+    {
+      "key": "dokali:109:4",
+      "split": "train",
+      "label": "ولا انا عابد ما عبدتم",
+      "votes": [
+        "tarteel: insert at end",
+        "deepdml: insert at end"
+      ],
+      "heard": {
+        "tarteel": "ولا انا عابد ما عبدتم ولا",
+        "deepdml": "ولا انا عابد ما عبدتم ولا",
+        "naazim_turbo": "ولا انا عابد ما عبدتم"
+      }
+    },
+    {
+      "key": "dokali:109:5",
+      "split": "train",
+      "label": "ولا انتم عابدون ما اعبد",
+      "votes": [
+        "tarteel: delete at start",
+        "deepdml: delete at start",
+        "naazim_turbo: delete at start, insert at end"
+      ],
+      "heard": {
+        "tarteel": "انتم عابدون ما اعبد",
+        "deepdml": "انتم عابدون ما اعبد",
+        "naazim_turbo": "انتم عابدون ما اعبد لكم"
+      }
+    },
+    {
+      "key": "dokali:109:6",
+      "split": "train",
+      "label": "لكم دينكم ولي دين",
+      "votes": [
+        "tarteel: delete at end",
+        "deepdml: delete at end",
+        "naazim_turbo: delete at start"
+      ],
+      "heard": {
+        "tarteel": "يدينكم وليدين",
+        "deepdml": "بديناكم وليدين",
+        "naazim_turbo": "دينكم ولي دينين"
+      }
+    },
+    {
+      "key": "dokali:111:4",
+      "split": "train",
+      "label": "وامراته حمالة الحطب",
+      "votes": [
+        "tarteel: delete at start, insert at end",
+        "naazim_turbo: delete at start, insert at end"
+      ],
+      "heard": {
+        "tarteel": "حمالة الحطب في جيده",
+        "deepdml": "حمالت الحطبثي جيد",
+        "naazim_turbo": "حمالة الحطب في جيدها"
+      }
+    },
+    {
+      "key": "dokali:113:1",
+      "split": "train",
+      "label": "قل اعوذ برب الفلق",
+      "votes": [
+        "tarteel: delete at start",
+        "deepdml: insert at end",
+        "naazim_turbo: delete at start, insert at end"
+      ],
+      "heard": {
+        "tarteel": "اعوذ برب الفلق",
+        "deepdml": "فاعوذ برب الفلق منه",
+        "naazim_turbo": "اعوذ برب الفلق من"
+      }
+    },
+    {
+      "key": "dokali:113:2",
+      "split": "train",
+      "label": "من شر ما خلق",
+      "votes": [
+        "tarteel: insert at end",
+        "deepdml: delete at start, insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "من شر ما خلق ومن",
+        "deepdml": "شر ما خلق ومن",
+        "naazim_turbo": "من شر ما خلق ومن شر ما خلق"
+      }
+    },
+    {
+      "key": "dokali:113:3",
+      "split": "train",
+      "label": "ومن شر غاسق اذا وقب",
+      "votes": [
+        "deepdml: insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "من شر غاسق اذا وقب",
+        "deepdml": "شد غاسق اذا وقب ومن",
+        "naazim_turbo": "من شر غاسق اذا وقب ومن"
+      }
+    },
+    {
+      "key": "husary:101:1",
+      "split": "train",
+      "label": "القارعة ما القارعة",
+      "votes": [
+        "deepdml: insert at start",
+        "naazim_turbo: insert at start"
+      ],
+      "heard": {
+        "tarteel": "القارعة ما القارعة",
+        "deepdml": "ما القارعة ما القارعة",
+        "naazim_turbo": "ما القارعة ما القارعة"
+      }
+    },
+    {
+      "key": "dokali:88:9",
+      "split": "test",
+      "label": "لسعيها راضية",
+      "votes": [
+        "tarteel: insert at start",
+        "naazim_turbo: insert at start"
+      ],
+      "heard": {
+        "tarteel": "كل شعياء راضية",
+        "deepdml": "لسعيها راضية",
+        "naazim_turbo": "كل سعيها راضية"
+      }
+    },
+    {
+      "key": "dokali:105:3",
+      "split": "test",
+      "label": "وارسل عليهم طيرا ابابيل",
+      "votes": [
+        "tarteel: insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "وارسل عليهم طيرا ابابيل كربيهم",
+        "deepdml": "وارسل عليهم طيرا ابابي لكربيهم",
+        "naazim_turbo": "وارسل عليهم طيرا ابابيل ترميهم"
+      }
+    },
+    {
+      "key": "dokali:106:4",
+      "split": "test",
+      "label": "الذي اطعمهم من جوع",
+      "votes": [
+        "tarteel: insert at end",
+        "deepdml: insert at end",
+        "naazim_turbo: delete at start, insert at end"
+      ],
+      "heard": {
+        "tarteel": "فاطعمهم من جوع وامن",
+        "deepdml": "ياطعمهم من جوع وامن",
+        "naazim_turbo": "اطعمهم من جوع وامن"
+      }
+    },
+    {
+      "key": "dokali:111:3",
+      "split": "test",
+      "label": "سيصلى نارا ذات لهب",
+      "votes": [
+        "tarteel: insert at end",
+        "deepdml: insert at end",
+        "naazim_turbo: insert at end"
+      ],
+      "heard": {
+        "tarteel": "سيصلى نارا ذات لهب وامرا",
+        "deepdml": "سيصلى نارا ذات لهب وامرا",
+        "naazim_turbo": "سيصلى نارا ذات لهب وامران"
+      }
+    }
+  ]
+}
