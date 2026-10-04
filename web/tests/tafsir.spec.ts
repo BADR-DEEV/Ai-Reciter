@@ -9,6 +9,6 @@ test("tafsir UI supports both languages, plain text and graceful failure", async
   await expect(page.locator(".tafsir-panel")).toContainText("Translation of meanings");
   await expect(page.locator(".tafsir-panel script")).toHaveCount(0);
   await page.getByLabel("Tafsir language").selectOption("ar");
-  await expect(page.locator(".tafsir-panel")).toContainText("Arabic tafsir");
+  await expect(page.locator(".tafsir-panel h3")).toContainText("التفسير العربي");
   await expect(page.locator('.tafsir-panel p[lang="ar"]')).toBeVisible();
 });

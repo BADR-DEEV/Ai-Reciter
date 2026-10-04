@@ -2,9 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
-// English is the default: the learn track is built for people who can't read
-// Arabic yet. Arabic switches the interface chrome; lesson teaching text stays
-// English for now.
+// English is the default for new readers. Course source teaching content that
+// has no reviewed Arabic edition is explicitly labeled; app chrome is bilingual.
 export type Lang = "en" | "ar";
 
 const STRINGS = {
@@ -21,7 +20,7 @@ const STRINGS = {
     feature2Title: "A partner that listens",
     feature2Body: "Say a sound and the model tells you whether it heard a strong ḥ or a soft h, a deep q or a light k. It never stores your voice.",
     feature3Title: "Real recitation",
-    feature3Body: "Follow Sheikh Al-Husary ayah by ayah, then recite whole surahs in the studio with word-by-word feedback.",
+    feature3Body: "Follow Sheikh Al-Huthaify ayah by ayah, or choose another Qālūn reciter, then practise in the studio.",
     pathTitle: "Your path",
     privacy: "Practice runs on this project’s own server. Recordings are processed and discarded.",
     learn: "Learn",
@@ -73,7 +72,7 @@ const STRINGS = {
     feature2Title: "رفيق يستمع إليك",
     feature2Body: "انطق الصوت وسيخبرك النموذج هل سمع ح أم ه، ق أم ك. لا يُحفظ صوتك.",
     feature3Title: "تلاوة حقيقية",
-    feature3Body: "تابع الشيخ الحصري آيةً آية، ثم اتلُ السورة كاملة في الاستوديو مع ملاحظات كلمةً كلمة.",
+    feature3Body: "تابع الشيخ الحذيفي آيةً آية، أو اختر قارئًا آخر برواية قالون، ثم تدرّب في الاستوديو.",
     pathTitle: "مسارك",
     privacy: "يعمل التدريب على خادم المشروع نفسه. تُعالَج التسجيلات ثم تُحذف.",
     learn: "تعلّم",
@@ -116,8 +115,8 @@ const STRINGS = {
 
 export type StringKey = keyof typeof STRINGS.en;
 const KEY = "rattil.lang";
-const LangContext = createContext<{ lang: Lang; t: (key: StringKey) => string; toggle: () => void }>({
-  lang: "en", t: key => STRINGS.en[key], toggle: () => undefined,
+const LangContext = createContext<{ lang: Lang; t: (key: StringKey) => string; c: (en: string, ar: string) => string; toggle: () => void }>({
+  lang: "en", t: key => STRINGS.en[key], c: en => en, toggle: () => undefined,
 });
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
@@ -129,7 +128,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return next;
   }), []);
   const t = useCallback((key: StringKey) => STRINGS[lang][key], [lang]);
-  return <LangContext.Provider value={{ lang, t, toggle }}>{children}</LangContext.Provider>;
+  const c = useCallback((en: string, ar: string) => lang === "ar" ? ar : en, [lang]);
+  useEffect(() => { document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr"; }, [lang]);
+  return <LangContext.Provider value={{ lang, t, c, toggle }}>{children}</LangContext.Provider>;
 }
 
 export const useLang = () => useContext(LangContext);

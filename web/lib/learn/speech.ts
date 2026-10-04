@@ -58,6 +58,7 @@ export async function playUrl(url: string, start = 0, end?: number, onStart?: ()
     const buffer = await load(ctx, url);
     if (token !== generation) return "stopped";
     if (ctx.state !== "running") await ctx.resume();
+    if (token !== generation) return "stopped";
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
@@ -92,11 +93,6 @@ function speakWithBrowser(text: string) {
   // left paused; give it a moment and make sure it is running.
   setTimeout(() => { synth.resume(); synth.speak(utterance); }, 60);
   return true;
-}
-
-/** Play one ayah out of a full-surah recording using millisecond timings. */
-export function playClip(src: string, start: number, end: number, onStart: () => void, onEnd: (result: "ended" | "stopped" | "failed") => void) {
-  void playUrl(src, start, end, onStart).then(onEnd);
 }
 
 export const stopClip = stopAudio;

@@ -31,16 +31,19 @@ test("landing alphabet tiles play their sound", async ({ page }) => {
   await expect.poll(() => starts(page)).toHaveLength(1);
 });
 
-test("ayah plays only its own segment of Al-Husary's recording", async ({ page }) => {
-  test.skip(!!process.env.OFFLINE, "Needs the MP3Quran CDN");
+test("ayah plays its own local Huthaify clip, not another reader's timings", async ({ page }) => {
   await page.goto("/learn/surah-112");
   await page.getByRole("button", { name: "Continue" }).click();
-  await page.getByRole("button", { name: "Listen to Al-Husary" }).click();
-  await expect(page.getByRole("button", { name: "Stop" })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByLabel("Reference reciter")).toHaveValue("huthaify");
+  const fetched = page.waitForResponse(r => r.url().includes("/api/reference-audio?") && r.url().includes("reciter=huthaify"));
+  await page.getByRole("button", { name: "Listen to ayah 1", exact: true }).click();
+  expect((await fetched).status()).toBe(200);
+  await expect(page.getByRole("button", { name: "Listen to ayah 1", exact: true })).toContainText("Stop", { timeout: 20000 });
   const [[duration, offset, length]] = await starts(page);
-  expect(duration).toBeGreaterThan(25);       // the whole surah was decoded
-  expect(offset).toBeCloseTo(9.24, 2);        // ayah 1 starts at 9.24 s
-  expect(length).toBeCloseTo(4.242, 2);       // and lasts 4.24 s
-  await page.getByRole("button", { name: "Stop" }).click();
-  await expect(page.getByRole("button", { name: "Listen to Al-Husary" })).toBeVisible();
+  expect(duration).toBeGreaterThan(1);
+  expect(duration).toBeLessThan(30);          // decoded only the ayah
+  expect(offset).toBe(0);                    // local clip starts at its own zero
+  expect(length).toBeUndefined();            // no foreign full-surah timings
+  await page.getByRole("button", { name: "Listen to ayah 1", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Listen to ayah 1", exact: true })).toContainText("Al-Huthaify");
 });

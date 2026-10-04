@@ -16,7 +16,7 @@ import torchaudio
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def build(metadata, output):
+def build(metadata, output, reciter_key="huthaify"):
     transform = torchaudio.transforms.MFCC(sample_rate=16000, n_mfcc=20,
         melkwargs={"n_fft": 400, "hop_length": 160, "n_mels": 40})
     rows = []
@@ -59,7 +59,7 @@ def build(metadata, output):
             ranked.append({"id": other["id"], "score": round(float(0.85 * similarities[i, j] + 0.15 * duration_score), 6)})
         neighbors[row["id"]] = sorted(ranked, key=lambda v: v["score"], reverse=True)[:30]
     result = {"method": "MFCC mean/std cosine (19 coefficients), corpus-standardized; 15% duration similarity",
-              "reciter": "Al-Hutafi (Qaloon)", "sample_rate": 16000,
+              "reciter": reciter_key, "reciter_key": reciter_key, "sample_rate": 16000,
               "warning": "Acoustic heuristic, not pronunciation or learned phonetic similarity. Review hard distractors by ear.",
               "clips": rows, "neighbors": neighbors}
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -71,7 +71,11 @@ def build(metadata, output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--metadata", type=Path, default=ROOT / "src/dataset_collection/dataset_qaloon_hutafi/metadata.jsonl")
-    parser.add_argument("--output", type=Path, default=ROOT / "web/public/quran/audio-similarity.json")
+    parser.add_argument("--metadata", type=Path)
+    parser.add_argument("--reciter", choices=("huthaify", "husary", "dokali"), default="huthaify")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    build(args.metadata, args.output)
+    output = args.output or ROOT / f"web/public/quran/audio-similarity-{args.reciter}.json"
+    folders = {"huthaify": "hutafi", "husary": "Husary", "dokali": "dokali"}
+    metadata = args.metadata or ROOT / f"src/dataset_collection/dataset_qaloon_{folders[args.reciter]}/metadata.jsonl"
+    build(metadata, output, args.reciter)

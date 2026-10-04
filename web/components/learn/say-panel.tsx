@@ -6,7 +6,7 @@ import { useLang } from "@/lib/i18n";
 import { checkPractice, type PracticeResult } from "@/lib/learn/api";
 import { LETTERS } from "@/lib/learn/letters";
 import { Rich } from "./rich";
-import { speak } from "@/lib/learn/speech";
+import { speak, stopAudio } from "@/lib/learn/speech";
 import { useRecorder, wavUrl } from "@/lib/learn/use-recorder";
 
 export type SayProps = {
@@ -22,7 +22,7 @@ const describe = (practice: string) => {
 
 /** Record the learner, ask the model, and explain what it heard. */
 export function SayPanel({ arabic, translit, mode, alternatives = [], listen, online, compact, onScore }: SayProps) {
-  const { t } = useLang();
+  const { t, c } = useLang();
   const recorder = useRecorder();
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<PracticeResult | null>(null);
@@ -35,6 +35,7 @@ export function SayPanel({ arabic, translit, mode, alternatives = [], listen, on
 
   const attempt = async () => {
     setResult(null); setError("");
+    stopAudio();
     const pcm = await recorder.record();
     if (!pcm) return;
     setPlayback(wavUrl(pcm));
@@ -59,8 +60,8 @@ export function SayPanel({ arabic, translit, mode, alternatives = [], listen, on
   } else if (result && "words" in result) {
     feedback = <>
       <p className="say-words" lang="ar" dir="rtl">{result.words.map(w => <span key={w.index} className={`say-word ${w.status}`}>{w.text}</span>)}</p>
-      <p>{verdict === "correct" ? "Every word was recognised." : `${result.words.filter(w => w.status === "correct").length} of ${result.words.length} words recognised. Grey words weren’t heard clearly.`}</p>
-      <p className="say-heard">Model heard: <span lang="ar" dir="rtl">{result.transcript || "nothing"}</span></p>
+      <p>{verdict === "correct" ? c("Every word was recognised.", "تعرّف النموذج على كل كلمة.") : c(`${result.words.filter(w => w.status === "correct").length} of ${result.words.length} words recognised. Grey words weren’t heard clearly.`, `تعرّف النموذج على ${result.words.filter(w => w.status === "correct").length} من ${result.words.length} كلمة. الكلمات الرمادية لم تُتعرّف بوضوح.`)}</p>
+      <p className="say-heard">{c("Model heard:", "ما تعرّف عليه النموذج:")} <span lang="ar" dir="rtl">{result.transcript || c("nothing", "لا شيء")}</span></p>
     </>;
   }
 

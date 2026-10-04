@@ -33,6 +33,8 @@ logger = logging.getLogger("reciter")
 
 class Engine:
     def __init__(self):
+        if MODEL_PATH.is_absolute() and not MODEL_PATH.is_dir():
+            raise RuntimeError(f"Local full model is missing: {MODEL_PATH}. Set RECITER_MODEL_PATH to your verified model directory, or restore the pinned private release with python src/deployment/restore_local_full.py. No automatic model substitution is performed.")
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.processor = WhisperProcessor.from_pretrained(str(MODEL_PATH), local_files_only=LOCAL_MODEL)
         dtype = torch.float16 if self.device == "cuda" else torch.float32

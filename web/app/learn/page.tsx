@@ -15,6 +15,7 @@ export default function Course() {
   return <div className="learn-shell" dir={lang === "ar" ? "rtl" : "ltr"} lang={lang}>
     <SiteHeader active="learn" />
     <main className="course">
+      {lang === "ar" && <p className="course-language-note">عناوين الدروس ومحتواها التفصيلي بالإنجليزية حاليًا؛ لم نعتمد نسخة عربية تعليمية بعد. واجهة الاستوديو والتحديات بالعربية متاحة.</p>}
       <section className="course-head">
         <div>
           <h1>{t("course")}</h1>

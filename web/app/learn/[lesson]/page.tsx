@@ -10,13 +10,14 @@ import { modelOnline } from "@/lib/learn/api";
 import { findLesson, nextLesson, type Step } from "@/lib/learn/curriculum";
 import { useProgress } from "@/lib/learn/progress";
 import { stopClip } from "@/lib/learn/speech";
+import { SiteHeader } from "@/components/learn/site-header";
 
 const SCORED = new Set<Step["kind"]>(["choice", "say", "ayah"]);
 
 export default function LessonPage() {
   const { lesson: id } = useParams<{ lesson: string }>();
   const lesson = findLesson(id);
-  const { t, lang } = useLang();
+  const { t, lang, c } = useLang();
   const { complete } = useProgress();
   // Wrongly answered choices are repeated once at the end of the lesson.
   const [queue, setQueue] = useState<number[]>(() => lesson ? lesson.steps.map((_, i) => i) : []);
@@ -73,7 +74,7 @@ export default function LessonPage() {
 
   const next = nextLesson(lesson.id);
   if (finished) {
-    return <div className="learn-shell" dir={lang === "ar" ? "rtl" : "ltr"} lang={lang}><main className="lesson-done">
+    return <div className="learn-shell" dir={lang === "ar" ? "rtl" : "ltr"} lang={lang}><SiteHeader active="learn" /><main className="lesson-done">
       <CheckCircle2 size={54} />
       <h1>{t("lessonComplete")}</h1>
       <p className="done-title">{lesson.title}</p>
@@ -90,13 +91,15 @@ export default function LessonPage() {
   const canSkip = (step.kind === "say" || step.kind === "ayah") && spoken === null;
 
   return <div className="learn-shell lesson-shell" lang={lang}>
+    <SiteHeader active="learn" />
     <header className="lesson-top">
       <a href="/learn" className="btn-icon" aria-label={t("exit")}><X size={20} /></a>
       <div className="meter" role="progressbar" aria-valuemin={0} aria-valuemax={queue.length} aria-valuenow={position}><span style={{ width: `${position / queue.length * 100}%` }} /></div>
       <span className="lesson-count">{position + 1}/{queue.length}</span>
     </header>
-    <main className="lesson-stage" key={`${position}-${stepIndex}`}>
-      {repeat && <p className="repeat-note">Let’s try this one again.</p>}
+    {lang === "ar" && <p className="course-language-note" dir="rtl">المحتوى التعليمي التفصيلي متاح بالإنجليزية حاليًا؛ لم نعرض ترجمة عربية غير مراجعة. أدوات التلاوة والاستماع متاحة بالعربية.</p>}
+    <main className="lesson-stage" dir="ltr" lang="en" key={`${position}-${stepIndex}`}>
+      {repeat && <p className="repeat-note">{c("Let’s try this one again.", "لنحاول هذه مرة أخرى.")}</p>}
       {step.kind === "intro" && <IntroStep step={step} />}
       {step.kind === "letter" && <LetterStep step={step} />}
       {step.kind === "forms" && <FormsStep step={step} />}

@@ -1,6 +1,7 @@
 // Short surahs taught in the final unit. Arabic is the project's Qālūn source
-// text (QaloonData_v10). Audio: Mahmoud Khalil Al-Husary, Qālūn ʿan Nāfiʿ, via
-// MP3Quran (reader 270) with that reader's own ayah timings in milliseconds.
+// text (QaloonData_v10). Historical Husary timing/Latin fields are retained as
+// source notes only; playback now uses reciters.ts + validated local ayah clips,
+// and visible phonetics come from qaloon-g2p.ts, never these old Latin fields.
 // Meanings are short plain-English renderings to give context, not a
 // scholarly translation.
 export type LessonAyah = { ayah: number; text: string; translit: string; meaning: string; start: number; end: number };

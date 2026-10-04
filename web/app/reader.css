@@ -1,0 +1,45 @@
+/* Shared top navigation; the studio no longer reserves a vertical rail. */
+.studio-shell .workspace{margin:0;width:100%}
+.studio-shell .lh-header{height:auto;min-height:76px;flex-wrap:wrap;padding-block:12px}
+.studio-shell .lh-nav{min-height:42px}
+.lh-nav a:first-child{display:flex}
+.studio-shell .session-bar{flex-wrap:wrap;gap:20px}
+.reciter-select{display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--green)}
+.reciter-select select{max-width:100%;min-width:160px;border:1px solid var(--line);border-radius:9px;padding:9px;background:var(--paper);font:inherit;color:var(--ink)}
+.studio-shell .reader-toolbar{height:auto;min-height:60px;gap:12px;flex-wrap:wrap;padding-block:12px}
+.reader-toolbar>span{display:flex;align-items:center;gap:8px}
+.studio-shell .view-switch{display:flex;flex-wrap:wrap;gap:5px}
+.studio-shell .view-switch button{white-space:normal;font-size:12px;padding:8px 10px}
+html[dir="rtl"] .studio-shell .view-switch button{font-size:14px}
+.studio-shell .text-mushaf .text-ayah{display:block;width:100%;margin:12px 0;padding:12px;border-bottom:1px solid var(--line)}
+.ayah-reading-line{font-family:'Amiri',serif;font-size:32px;line-height:1.95}
+.phonetic-text .ayah-reading-line{font-family:'DM Sans',sans-serif;font-size:clamp(24px,2.4vw,36px);line-height:1.8;text-align:start;overflow-wrap:anywhere}
+.current-phonetic{font-size:21px;line-height:1.7;overflow-wrap:anywhere;margin-block:14px}
+.ayah-listen{font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;line-height:1.5;margin-block:10px;text-align:start}
+.ayah-listen .btn-listen{font-size:12px;padding:7px 12px}
+.ayah-listen small{max-width:400px;color:var(--red)}
+.reading-aid-warning,.phonetic-review{font:12px/1.7 'DM Sans',sans-serif;color:#75602f;padding-block:10px;text-align:start}
+.ayah-meaning-pane{font:14px/1.8 'DM Sans',sans-serif;text-align:start}
+.ayah-meaning-pane p{font-size:17px;line-height:1.85;margin-block:12px}
+.ayah-meaning-pane p[lang="ar"]{font-family:'Amiri',serif;font-size:23px}
+.tajweed-word.pending{color:var(--ink)}
+.tajweed-span{font-weight:600}
+.tajweed-legend{padding:16px;border:1px solid var(--line);background:var(--paper);border-radius:12px;margin-bottom:16px;line-height:1.8}
+.tajweed-legend summary{cursor:pointer;font-weight:600;color:var(--green)}
+.tajweed-legend ul{display:flex;flex-wrap:wrap;gap:10px 22px;padding:12px 0;list-style:none}
+.tajweed-legend li{display:flex;align-items:center;gap:8px}
+.tajweed-legend i{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+html[dir="rtl"] .studio-shell h1{font-family:'Amiri',serif;letter-spacing:0}
+html[dir="rtl"] .studio-shell .eyebrow{letter-spacing:0}
+.course-language-note{font-size:14px;line-height:1.8;padding:12px 16px;margin-block:16px;background:var(--gold-wash);border-radius:10px}
+@media(max-width:760px){
+  .lh-header{height:auto;min-height:70px;flex-wrap:wrap;gap:12px;padding-block:12px}
+  .lh-nav{order:3;flex-basis:100%;height:auto;min-height:38px;justify-content:space-between;gap:12px}
+  .lh-nav a{display:flex;font-size:12px}
+  .lh-right{gap:8px}
+  .studio-shell .session-bar{gap:16px}
+  .studio-shell .session-panel{grid-template-columns:1fr}
+  .ayah-reading-line{font-size:29px}
+  .studio-shell .quran-paper{padding-inline:14px}
+  .studio-shell .text-mushaf .text-ayah{padding-inline:4px}
+}

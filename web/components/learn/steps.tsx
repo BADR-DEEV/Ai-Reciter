@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Loader2, Mic2, Pause, Volume2 } from "lucide-react";
+import { useEffect } from "react";
+import { Volume2 } from "lucide-react";
 import type { Step } from "@/lib/learn/curriculum";
 import { PLACE_LABEL, forms, letter } from "@/lib/learn/letters";
 import { SURAHS } from "@/lib/learn/surahs";
-import { playClip, speak, stopClip } from "@/lib/learn/speech";
+import { speak } from "@/lib/learn/speech";
 import { useLang } from "@/lib/i18n";
 import { Rich } from "./rich";
 import { SayPanel, speakText } from "./say-panel";
 import { PhoneticAid } from "@/components/phonetic-aid";
 import { TafsirPanel } from "@/components/tafsir-panel";
 import { qaloonG2P } from "@/lib/qaloon-g2p";
+import { AyahListen } from "@/components/ayah-listen";
+import { ReciterSelector } from "@/components/reciter-selector";
+import { useReferenceReciter } from "@/lib/use-reference-reciter";
 
 const Listen = ({ text, label }: { text: string; label?: string }) =>
   <button className="btn-listen" onClick={() => speak(text)}><Volume2 size={17} /> {label || "Listen"}</button>;
@@ -107,24 +110,14 @@ export function AyahStep({ step, online, onScore }: { step: Extract<Step, { kind
   const { t } = useLang();
   const surah = SURAHS.find(s => s.id === step.surah)!;
   const ayah = surah.ayahs.find(a => a.ayah === step.ayah)!;
-  const [audio, setAudio] = useState<"idle" | "loading" | "playing" | "failed">("idle");
-  useEffect(() => () => stopClip(), []);
-  const play = () => {
-    if (audio === "playing" || audio === "loading") { stopClip(); setAudio("idle"); return; }
-    setAudio("loading");
-    playClip(surah.audio, ayah.start, ayah.end, () => setAudio("playing"),
-      result => setAudio(current => result === "failed" ? "failed" : current === "loading" || current === "playing" ? "idle" : current));
-  };
+  const { reciter, selectReciter } = useReferenceReciter();
   return <div className="step-ayah">
     <p className="ayah-ref">{surah.name} · Ayah {ayah.ayah}</p>
     <p className="ayah-text" lang="ar" dir="rtl">{ayah.text}</p>
     <PhoneticAid text={ayah.text} />
     <p className="ayah-meaning"><span>{t("meaning")}:</span> {ayah.meaning}</p>
-    <button className="btn-listen" onClick={play}>
-      {audio === "loading" ? <Loader2 className="spin" size={17} /> : audio === "playing" ? <Pause size={17} /> : <Mic2 size={17} />}
-      {audio === "loading" ? "Loading recitation…" : audio === "playing" ? "Stop" : "Listen to Al-Husary"}
-    </button>
-    {audio === "failed" && <p className="say-error" role="alert">Couldn’t load the recitation. Check your internet connection and try again.</p>}
+    <ReciterSelector value={reciter} onChange={selectReciter} />
+    <AyahListen surah={surah.id} ayah={ayah.ayah} reciter={reciter} />
     <SayPanel compact arabic={ayah.text} translit={qaloonG2P(ayah.text).text} mode="reading" online={online} onScore={onScore} />
     <TafsirPanel surah={surah.id} ayah={ayah.ayah} />
   </div>;

@@ -1,56 +1,57 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowRight, BookOpen, GraduationCap, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Expand, Headphones, Leaf, Mic, Moon, Play, RotateCcw, Search, ShieldCheck, Sparkles, Square, Upload, X } from "lucide-react";
+import { ArrowRight, BookOpen, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Expand, Headphones, Leaf, Mic, Play, RotateCcw, Search, ShieldCheck, Sparkles, Square, Upload, X } from "lucide-react";
 import type { Manifest, Surah } from "@/lib/types";
 import { useRecitation } from "@/lib/use-recitation";
+import { useLang } from "@/lib/i18n";
+import { useReferenceReciter } from "@/lib/use-reference-reciter";
+import { qaloonG2P } from "@/lib/qaloon-g2p";
+import { stopAudio } from "@/lib/learn/speech";
+import type { TajweedMushaf } from "@/lib/tajweed";
+import { SiteHeader } from "@/components/learn/site-header";
 import { AyahWords } from "@/components/ayah-words";
+import { AyahListen } from "@/components/ayah-listen";
+import { AyahMeaning } from "@/components/ayah-meaning";
+import { ReciterSelector } from "@/components/reciter-selector";
 import { PhoneticAid } from "@/components/phonetic-aid";
 import { TafsirPanel } from "@/components/tafsir-panel";
 import { ServiceStatus } from "@/components/service-status";
+import { TajweedLegend } from "@/components/tajweed-legend";
 
-function Ornament({ small = false }: { small?: boolean }) {
-  return <span className={`ornament ${small ? "small" : ""}`} aria-hidden="true"><span>✦</span></span>;
-}
+type View = "mushaf" | "text" | "phonetic" | "meaning";
+function Ornament() { return <span className="ornament" aria-hidden="true"><span>✦</span></span>; }
 
-export default function Home() {
+export default function Studio() {
+  const { lang, c } = useLang();
+  const { reciter, selectReciter } = useReferenceReciter();
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [surah, setSurah] = useState<Surah | null>(null);
   const [selected, setSelected] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [picker, setPicker] = useState(false);
-  const [query, setQuery] = useState("");
-  const [help, setHelp] = useState(false);
-  const [pageIndex, setPageIndex] = useState(0);
-  const [mode, setMode] = useState<"mushaf" | "text">("mushaf");
-  const [fullscreen, setFullscreen] = useState(false);
-  const textReader = useRef<HTMLDivElement>(null);
-  const audioInput = useRef<HTMLInputElement>(null);
-  const [startAyah, setStartAyah] = useState(1);
-  const [showPhonetics, setShowPhonetics] = useState(false);
+  const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState("");
+  const [picker, setPicker] = useState(false), [query, setQuery] = useState(""), [help, setHelp] = useState(false);
+  const [pageIndex, setPageIndex] = useState(0), [mode, setMode] = useState<View>("text");
+  const [fullscreen, setFullscreen] = useState(false), [startAyah, setStartAyah] = useState(1);
+  const [showPhonetics, setShowPhonetics] = useState(false), [showTajweed, setShowTajweed] = useState(false);
+  const [tajweed, setTajweed] = useState<TajweedMushaf | null>(null), [tajweedError, setTajweedError] = useState(false);
+  const textReader = useRef<HTMLDivElement>(null), audioInput = useRef<HTMLInputElement>(null);
   const recitation = useRecitation(surah, startAyah);
   const active = ["connecting", "listening", "stopping"].includes(recitation.state);
 
+  useEffect(() => { const requested = Number(new URLSearchParams(window.location.search).get("surah")); if (Number.isInteger(requested) && requested >= 1 && requested <= 114) setSelected(requested); }, []);
+  useEffect(() => { const controller = new AbortController(); fetch("/quran/manifest.json", { signal: controller.signal }).then(r => { if (!r.ok) throw new Error("Quran assets are not cached. Run the cache script in the README."); return r.json(); }).then(setManifest).catch(e => { if (e.name !== "AbortError") setLoadError(e.message); }); return () => controller.abort(); }, []);
   useEffect(() => {
-    // Lessons link here with ?surah=N to recite a surah they just learned.
-    const requested = Number(new URLSearchParams(window.location.search).get("surah"));
-    if (Number.isInteger(requested) && requested >= 1 && requested <= 114) setSelected(requested);
-  }, []);
-  useEffect(() => {
-    fetch("/quran/manifest.json").then(r => { if (!r.ok) throw new Error("Quran assets are not cached yet. Run the cache script in the README."); return r.json(); }).then(setManifest).catch(error => setLoadError(error.message));
-  }, []);
-  useEffect(() => {
-    const controller = new AbortController();
-    setLoading(true); setLoadError(""); setPageIndex(0);
-    fetch(`/quran/surahs/${String(selected).padStart(3, "0")}.json`, { signal: controller.signal }).then(r => { if (!r.ok) throw new Error("Could not load this surah. Check your local Quran cache."); return r.json(); }).then(data => { setSurah(data); setMode("text"); setLoading(false); }).catch(error => { if (error.name !== "AbortError") { setLoadError(error.message); setLoading(false); } });
+    const controller = new AbortController(); setLoading(true); setLoadError(""); setPageIndex(0); stopAudio();
+    fetch(`/quran/surahs/${String(selected).padStart(3, "0")}.json`, { signal: controller.signal }).then(r => { if (!r.ok) throw new Error("Could not load this surah. Check the local Quran cache."); return r.json(); }).then(data => { setSurah(data); setLoading(false); }).catch(e => { if (e.name !== "AbortError") { setLoadError(e.message); setLoading(false); } });
     return () => controller.abort();
   }, [selected]);
   useEffect(() => {
-    const listener = () => setFullscreen(Boolean(document.fullscreenElement));
-    document.addEventListener("fullscreenchange", listener);
-    return () => document.removeEventListener("fullscreenchange", listener);
-  }, []);
+    if (!showTajweed) return;
+    const controller = new AbortController(); setTajweed(null); setTajweedError(false);
+    fetch(`/api/tajweed?surah=${selected}`, { signal: controller.signal }).then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(setTajweed).catch(e => { if (e.name !== "AbortError") setTajweedError(true); });
+    return () => controller.abort();
+  }, [selected, showTajweed]);
+  useEffect(() => { const listener = () => setFullscreen(Boolean(document.fullscreenElement)); document.addEventListener("fullscreenchange", listener); return () => { document.removeEventListener("fullscreenchange", listener); stopAudio(); }; }, []);
   useEffect(() => {
     if (!picker && !help) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -59,14 +60,9 @@ export default function Home() {
     focusable()[0]?.focus();
     const listener = (e: KeyboardEvent) => {
       if (e.key === "Escape") { setPicker(false); setHelp(false); }
-      if (e.key === "Tab") {
-        const elements = focusable(), first = elements[0], last = elements[elements.length - 1];
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
-        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
-      }
+      if (e.key === "Tab") { const elements = focusable(), first = elements[0], last = elements[elements.length - 1]; if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); } }
     };
-    document.addEventListener("keydown", listener);
-    return () => { document.removeEventListener("keydown", listener); previous?.focus(); };
+    document.addEventListener("keydown", listener); return () => { document.removeEventListener("keydown", listener); previous?.focus(); };
   }, [picker, help]);
 
   const pages = useMemo(() => [...new Set(surah?.ayahs.flatMap(a => a.regions.map(r => r.page)) || [])], [surah]);
@@ -74,147 +70,97 @@ export default function Home() {
   const current = recitation.update?.current ?? (recitation.state === "complete" ? null : startAyah);
   const currentAyah = surah?.ayahs.find(a => a.ayah === current);
   const finalized = Object.values(results).filter(r => r.final);
-  const wordResults = Object.values(results).flatMap(result => result.words || []);
-  const heardWords = wordResults.filter(word => word.status === "correct").length;
-  const omittedWords = wordResults.filter(word => word.status === "missed").length;
+  const wordResults = Object.values(results).flatMap(r => r.words || []);
+  const heardWords = wordResults.filter(w => w.status === "correct").length, omittedWords = wordResults.filter(w => w.status === "missed").length;
   const progress = surah ? Math.round(finalized.length / surah.ayahs.length * 100) : 0;
-  const agreement = finalized.length ? Math.round(finalized.reduce((sum, r) => sum + r.score, 0) / finalized.length * 100) : null;
-  const pagePath = pages[pageIndex];
-  const pageInfo = pagePath ? manifest?.pages[pagePath.split("/").pop()!] : null;
+  const pagePath = pages[pageIndex], pageInfo = pagePath ? manifest?.pages[pagePath.split("/").pop()!] : null;
   const filtered = manifest?.surahs.filter(s => `${s.id} ${s.name} ${s.arabic}`.toLowerCase().includes(query.toLowerCase())) || [];
-
+  const annotations = new Map(tajweed?.surahs.find(s => s.id === selected)?.ayahs.map(a => [a.ayah, a]) || []);
+  useEffect(() => { const page = currentAyah?.regions[0]?.page; if (page && pages.includes(page)) setPageIndex(pages.indexOf(page)); }, [currentAyah, pages]);
+  useEffect(() => { if (active) { stopAudio(); setMode(current => current === "mushaf" ? "text" : current); } }, [active]);
   useEffect(() => {
-    const page = currentAyah?.regions[0]?.page;
-    if (page && pages.includes(page)) setPageIndex(pages.indexOf(page));
-  }, [currentAyah, pages]);
-
-  useEffect(() => {
-    if (active) setMode("text");
-  }, [active, surah]);
-
-  useEffect(() => {
-    if (!active || mode !== "text" || !textReader.current || !current) return;
-    const container = textReader.current;
-    const ayah = container.querySelector<HTMLElement>(`[data-ayah="${current}"]`);
+    if (!active || mode === "mushaf" || !textReader.current || !current) return;
+    const container = textReader.current, ayah = container.querySelector<HTMLElement>(`[data-ayah="${current}"]`);
     if (!ayah) return;
-    const matched = ayah.querySelectorAll<HTMLElement>('.quran-word.correct');
-    const anchor = matched[matched.length - 1] || ayah;
-    const box = anchor.getBoundingClientRect();
-    const top = box.top - container.getBoundingClientRect().top;
-    if (top < 0 || top + box.height > container.clientHeight) {
-      container.scrollTo({ top: container.scrollTop + top - container.clientHeight / 3, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
-    }
+    const matched = ayah.querySelectorAll<HTMLElement>(".quran-word.correct"), anchor = matched[matched.length - 1] || ayah;
+    const box = anchor.getBoundingClientRect(), top = box.top - container.getBoundingClientRect().top;
+    if (top < 0 || top + box.height > container.clientHeight) container.scrollTo({ top: container.scrollTop + top - container.clientHeight / 3, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   }, [active, current, mode, recitation.update?.results]);
+  const selectSurah = (id: number) => { recitation.reset(); stopAudio(); setStartAyah(1); setSelected(id); setPicker(false); setQuery(""); };
+  const toggleFullscreen = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* Optional. */ } };
 
-  const toggleFullscreen = async () => {
-    try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); }
-    catch { /* Fullscreen is optional in embedded browsers. */ }
-  };
-  const selectSurah = (id: number) => { recitation.reset(); setStartAyah(1); setSelected(id); setPicker(false); setQuery(""); };
-
-  return <div className="app-shell">
-    <aside className="rail" aria-label="Primary navigation">
-      <a href="/" className="brand-symbol" aria-label="Rattil home"><Ornament small /></a>
-      <div className="rail-divider" />
-      <button className="rail-button selected" title="Recitation workspace" aria-label="Recitation workspace"><BookOpen size={21} /></button>
-      <a className="rail-button" href="/learn" title="Learn to read" aria-label="Learn to read"><GraduationCap size={21} /></a>
-      <button className="rail-button" title="Choose a surah" aria-label="Choose a surah" disabled={active} onClick={() => setPicker(true)}><Search size={20} /></button>
-      <button className="rail-button" title="Presentation demo" aria-label="Start presentation demo" disabled={active || loading || !surah} onClick={recitation.startDemo}><Play size={20} /></button>
-      <div className="rail-bottom"><button className="rail-button" title="How it works" aria-label="How it works" onClick={() => setHelp(true)}><CircleHelp size={21} /></button><div className="avatar">Q</div></div>
-    </aside>
-
+  return <div className="app-shell studio-shell" dir={lang === "ar" ? "rtl" : "ltr"}>
     <div className="workspace">
-      <header className="topbar">
-        <a className="wordmark" href="/">rattil<span>رَتِّل</span></a>
-        <nav className="topnav" aria-label="Workspace"><a href="/learn">Learn to read</a><a href="/games">Challenges</a><a href="/profile">Profile</a><span className="topnav-active">Recitation studio</span><button onClick={() => setHelp(true)}>How it works <ArrowRight size={14} /></button></nav>
-        <div className="topbar-right"><span className="local-pill"><span /> Local & private</span><button className="icon-button" title="Presentation fullscreen" aria-label={fullscreen ? "Exit fullscreen" : "Enter fullscreen"} onClick={toggleFullscreen}><Expand size={18} /></button></div>
-      </header>
-
+      <SiteHeader active="studio"><button className="icon-button" aria-label={c(fullscreen ? "Exit fullscreen" : "Enter fullscreen", fullscreen ? "الخروج من ملء الشاشة" : "ملء الشاشة")} onClick={toggleFullscreen}><Expand size={18} /></button></SiteHeader>
       <main>
-        <section className="intro">
-          <div><div className="eyebrow"><span className="tiny-star">✦</span> IN THE NAME OF ALLAH, THE MOST MERCIFUL</div><h1>A little practice. A deeper connection.</h1><p>Recite at your own pace. Let every ayah be a step closer.</p></div>
-          <div className="intro-calligraphy" lang="ar" dir="rtl">وَرَتِّلِ الْقُرْآنَ تَرْتِيلًا<span>And recite the Quran with measured recitation. · 73:4</span></div>
+        <section className="intro"><div><div className="eyebrow">{c("IN THE NAME OF ALLAH, THE MOST MERCIFUL", "بسم الله الرحمن الرحيم")}</div><h1>{c("A little practice. A deeper connection.", "تدريب قليل، وصلة أعمق بالقرآن.")}</h1><p>{c("Recite at your own pace. Let every ayah be a step closer.", "اتلُ على مهل؛ واجعل كل آية خطوة أقرب.")}</p></div><button className="btn-quiet" onClick={() => setHelp(true)}>{c("How it works", "كيف يعمل")} <CircleHelp size={16} /></button></section>
+        <section className="session-bar" aria-label={c("Session settings", "إعدادات الجلسة")}>
+          <div className="session-picker"><span className="field-label">{c("YOUR SURAH", "السورة")}</span><button disabled={active || !manifest} onClick={() => setPicker(true)} className="surah-select"><span className="surah-number">{String(selected).padStart(2, "0")}</span><strong>{lang === "ar" ? surah?.arabic || "الفاتحة" : surah?.name || "Al-Fātiḥah"}</strong><ChevronDown size={17} /></button></div>
+          <div className="session-riwayah"><span className="field-label">{c("RECITATION TRADITION", "الرواية")}</span><span><BookOpen size={16} />{c("Qālūn ʿan Nāfiʿ", "قالون عن نافع")}</span></div>
+          <ReciterSelector value={reciter} onChange={selectReciter} disabled={active} />
         </section>
-
-        <section className="session-bar" aria-label="Session settings">
-          <div className="session-picker"><span className="field-label">YOUR SURAH</span><button onClick={() => setPicker(true)} disabled={active || !manifest} className="surah-select"><span className="surah-number">{String(selected).padStart(2, "0")}</span><strong>{surah?.name || "Al-Fātiḥah"}</strong><span className="surah-arabic" lang="ar">{surah?.arabic || "الفاتحة"}</span><ChevronDown size={17} /></button></div>
-          <div className="session-divider" /><div className="session-riwayah"><span className="field-label">RECITATION TRADITION</span><span><BookOpen size={16} /> Qālūn ʿan Nāfiʿ <span className="mini-pill">Riwayah</span></span></div>
-          <div className="session-ready"><span className={`status-dot ${active ? "pulsing" : ""}`} /><span>{recitation.demo ? "Presentation demo" : active ? "Session in progress" : "Your quiet space is ready"}</span></div>
-        </section>
-
-        {(loadError || recitation.error) && <div className="error-message" role="alert">{loadError || recitation.error}</div>}
-        {surah && !surah.trained && <div className="notice"><CircleHelp size={16} /> This surah is available to read, but lies outside the model’s training coverage. Live matching is experimental.</div>}
-        {recitation.demo && <div className="demo-banner"><Sparkles size={16} /><strong>Presentation demo</strong> Simulated word-by-word results, including an omitted word and a missed ayah. No microphone or model inference.</div>}
-        <section className="reading-tools"><label>Start / resume from ayah <select aria-label="Starting ayah" disabled={active} value={startAyah} onChange={e => setStartAyah(Number(e.target.value))}>{surah?.ayahs.map(a => <option key={a.ayah} value={a.ayah}>{a.ayah}</option>)}</select></label>
-          <label><input type="checkbox" checked={showPhonetics} onChange={e => setShowPhonetics(e.target.checked)} /> Show draft Qālūn phonetics</label><span role="status">{recitation.connection}</span></section>
-
+        {(loadError || recitation.error) && <div className="error-message" role="alert">{c(loadError || recitation.error, "تعذّر تحميل النص أو الاتصال بالنموذج. تحقّق من الخادم المحلي؛ نتائجك الحالية محفوظة.")}</div>}
+        {surah && !surah.trained && <div className="notice">{c("Reading is available; this surah is outside ASR training coverage. Live matching is experimental. Local ayah audio covers Fātiḥah/Juz ʿAmma only.", "القراءة متاحة، لكن السورة خارج نطاق تدريب التعرف الصوتي، والمطابقة تجريبية. المقاطع المحلية تشمل الفاتحة وجزء عمّ فقط.")}</div>}
+        {recitation.demo && <div className="demo-banner"><Sparkles size={16} /><strong>{c("Presentation demo", "عرض توضيحي")}</strong>{c("Simulated word-by-word results. No microphone or model inference.", "نتائج محاكاة كلمة بكلمة؛ دون ميكروفون أو استدلال بالنموذج.")}</div>}
+        <section className="reading-tools"><label>{c("Start / resume from ayah", "ابدأ أو استأنف من الآية")}<select aria-label={c("Starting ayah", "آية البداية")} disabled={active} value={startAyah} onChange={e => setStartAyah(Number(e.target.value))}>{surah?.ayahs.map(a => <option key={a.ayah} value={a.ayah}>{a.ayah}</option>)}</select></label>
+          <label><input type="checkbox" checked={showPhonetics} onChange={e => setShowPhonetics(e.target.checked)} />{c("Show draft Qālūn phonetics", "أظهر النقل الصوتي التجريبي لقالون")}</label>
+          <label><input type="checkbox" checked={showTajweed} onChange={e => setShowTajweed(e.target.checked)} />{c("Draft tajweed colors", "ألوان التجويد التجريبية")}</label>
+          <span role="status">{c(recitation.connection, active ? "الجلسة متصلة؛ راقب حالة الخادم" : "جاهز")}</span></section>
+        {showTajweed && (tajweed ? <TajweedLegend rules={tajweed.rules} /> : <p role="status">{tajweedError ? c("Tajweed file unavailable. Run build_qalon_tajweed.py; canonical text is unchanged.", "ملف التجويد غير متاح. شغّل مولّد التجويد؛ النص الأصلي لم يتغير.") : c("Loading reviewable annotations…", "جارٍ تحميل العلامات للمراجعة…")}</p>)}
         <div className="studio-grid">
-          <section className="mushaf-card" aria-label="Quran reader">
-            <div className="reader-toolbar"><div><BookOpen size={17} /><span>The noble Quran</span><span className="reader-tag">Word by word</span></div><div className="view-switch" aria-label="Reader view"><button className={mode === "mushaf" ? "active" : ""} disabled={active} title="SVG reading view; word highlights use Ayah view" onClick={() => setMode("mushaf")}>Mushaf</button><button className={mode === "text" ? "active" : ""} onClick={() => setMode("text")}>Ayah view</button></div></div>
+          <section className="mushaf-card" aria-label={c("Quran reader", "قارئ القرآن")}>
+            <div className="reader-toolbar"><span><BookOpen size={17} />{c("The noble Quran", "القرآن الكريم")}</span><div className="view-switch" aria-label={c("Reader view", "طريقة العرض")}>{([
+              ["mushaf", c("Mushaf", "المصحف المصوّر")], ["text", c("Ayah view", "النص العربي")], ["phonetic", c("Phonetics", "النقل الصوتي")], ["meaning", c("Meaning + phonetics", "المعنى والنقل الصوتي")],
+            ] as [View, string][]).map(([id, label]) => <button key={id} aria-pressed={mode === id} className={mode === id ? "active" : ""} disabled={id === "mushaf" && active} onClick={() => setMode(id)}>{label}</button>)}</div></div>
             <div className={`quran-paper ${selected === 1 ? "fatiha" : ""}`}>
-              <div className="paper-corner top-left" /><div className="paper-corner top-right" /><div className="paper-corner bottom-left" /><div className="paper-corner bottom-right" />
-              <div className="surah-heading"><Ornament /><div><span className="surah-caption">SURAH {String(selected).padStart(3, "0")}</span><h2 lang="ar" dir="rtl">سُورَةُ {surah?.arabic || "الفَاتِحَة"}</h2><span>{surah?.name || "Al-Fātiḥah"}</span></div><Ornament /></div>
+              <div className="surah-heading"><Ornament /><div><span className="surah-caption">{c("SURAH", "سورة")} {String(selected).padStart(3, "0")}</span><h2 lang="ar" dir="rtl">سُورَةُ {surah?.arabic || "الفَاتِحَة"}</h2><span>{surah?.name}</span></div><Ornament /></div>
               {selected !== 9 && mode === "text" && <div className="basmalah" lang="ar" dir="rtl">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>}
-              {loading ? <div className="reader-placeholder"><Leaf className="loading-leaf" /> Preparing your mushaf…</div> : mode === "mushaf" && pageInfo ? <div className="svg-page" style={{ aspectRatio: pageInfo.viewBox.split(" ").slice(2).join(" / ") }}>
-                {/* Deliberately rendered as an image: remote SVG markup cannot execute. */}
+              {(mode === "phonetic" || mode === "meaning") && <p className="reading-aid-warning">{c("Draft Qālūn reading aid; not teacher-approved. Listen and learn Arabic letters alongside it.", "نقل صوتي تجريبي لقالون لم يعتمده معلم. استمع وتعلّم الحروف العربية معه.")}</p>}
+              {loading ? <div className="reader-placeholder"><Leaf className="loading-leaf" />{c("Preparing your mushaf…", "جارٍ تجهيز المصحف…")}</div> : mode === "mushaf" && pageInfo ? <div className="svg-page" style={{ aspectRatio: pageInfo.viewBox.split(" ").slice(2).join(" / ") }}>
+                {/* External SVG remains an image, never executable markup. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={pagePath} alt={`Quran page ${pagePath.split("/").pop()?.replace(".svg", "")}`} draggable={false} />
-                <svg viewBox={pageInfo.viewBox} aria-label="Ayah recitation highlights" className="ayah-overlay">
-                  {surah?.ayahs.flatMap(ayah => ayah.regions.filter(region => region.page === pagePath).map((region, index) => {
-                    const result = results[ayah.ayah];
-                    const status = surah.preciseGeometry ? result?.status || (ayah.ayah === current && active ? "listening" : "pending") : "pending";
-                    return <polygon key={`${ayah.ayah}-${index}`} points={region.polygon} className={`ayah-region ${status}`}><title>Ayah {ayah.ayah}: {status}{result ? ` · ${Math.round(result.score * 100)}% text agreement` : ""}</title></polygon>;
-                  }))}
-                </svg>
-              </div> : <div className="text-mushaf word-mode" ref={textReader} lang="ar" dir="rtl">{surah?.ayahs.map(ayah => <div key={ayah.ayah} data-ayah={ayah.ayah} className={`text-ayah ${results[ayah.ayah]?.status || (ayah.ayah === current && active ? "listening" : "pending")}`}><AyahWords ayah={ayah} result={results[ayah.ayah]} /><span className="ayah-medallion">{ayah.ayah.toLocaleString("ar")}</span>{showPhonetics && <PhoneticAid text={ayah.text} />}</div>)}</div>}
-              {mode === "mushaf" && <p className="geometry-note">Switch to Ayah view for individual heard and omitted word colors.</p>}
-              {surah && !surah.preciseGeometry && <p className="geometry-note">Qālūn ayah divisions differ from this page artwork. Live highlighting uses Ayah view.</p>}
-              {surah?.ayahs.some(a => !a.regions.length) && mode === "mushaf" && <p className="geometry-note">Some ayahs have no API polygon. Use Ayah view for complete text.</p>}
-              <div className="paper-bottom"><span /><span>۞</span><span /></div>
+                <img src={pagePath} alt={c(`Quran page ${pagePath.split("/").pop()?.replace(".svg", "")}`, `صفحة القرآن ${pageIndex + 1}`)} draggable={false} />
+                <svg viewBox={pageInfo.viewBox} aria-label={c("Ayah recitation highlights", "تمييز الآيات")} className="ayah-overlay">{surah?.ayahs.flatMap(a => a.regions.filter(r => r.page === pagePath).map((r, i) => <polygon key={`${a.ayah}-${i}`} points={r.polygon} className={`ayah-region ${surah.preciseGeometry ? results[a.ayah]?.status || "pending" : "pending"}`}><title>{c(`Ayah ${a.ayah}`, `الآية ${a.ayah}`)}</title></polygon>))}</svg>
+              </div> : <div className={`text-mushaf word-mode ${mode === "phonetic" ? "phonetic-text" : mode === "meaning" ? "meaning-text" : ""}`} ref={textReader} lang={mode === "phonetic" ? "en" : "ar"} dir={mode === "phonetic" ? "ltr" : "rtl"}>{surah?.ayahs.map(ayah => {
+                const phonetics = qaloonG2P(ayah.text);
+                return <div key={ayah.ayah} data-ayah={ayah.ayah} className={`text-ayah ${results[ayah.ayah]?.status || (ayah.ayah === current && active ? "listening" : "pending")}`}>
+                  <div className="ayah-reading-line">{mode === "phonetic" ? phonetics.words.map((word, i) => <span key={i}><span className={`quran-word ${results[ayah.ayah]?.words?.[i]?.status || "pending"}`} data-word-index={i}>{word}</span>{" "}</span>) : <AyahWords ayah={ayah} result={results[ayah.ayah]} tajweed={showTajweed ? annotations.get(ayah.ayah) : undefined} rules={tajweed?.rules} lang={lang} />}<span className="ayah-medallion">{ayah.ayah.toLocaleString(lang)}</span></div>
+                  {(showPhonetics && mode === "text" || mode === "meaning") && <PhoneticAid text={ayah.text} />}
+                  {mode === "phonetic" && phonetics.warnings.length > 0 && <details className="phonetic-review"><summary>{c("Pronunciation review notes", "ملاحظات مراجعة النطق")}</summary><ul>{phonetics.warnings.map(w => <li key={w}>{w}</li>)}</ul></details>}
+                  <AyahListen surah={selected} ayah={ayah.ayah} reciter={reciter} disabled={active} />
+                  {mode === "meaning" && <AyahMeaning surah={selected} ayah={ayah.ayah} />}
+                </div>;
+              })}</div>}
+              {mode === "mushaf" && <><p className="geometry-note">{c("Supplied SVG artwork is not certified Qālūn spelling. Use Ayah view for canonical source text, letter colors and word matching.", "المصحف المصوّر المعروض ليس توثيقًا لرسم قالون. اختر النص العربي لعرض نص المصدر وألوان الحروف والمطابقة.")}</p>{currentAyah && <AyahListen surah={selected} ayah={currentAyah.ayah} reciter={reciter} disabled={active} />}</>}
             </div>
-            <div className="reader-footer"><div className="legend"><span><i className="correct" />Heard</span><span><i className="missed" />Omitted</span><span><i className="pending" />Not reached</span></div><div className="page-controls"><button aria-label="Previous Quran page" disabled={pageIndex === 0 || !pages.length} onClick={() => setPageIndex(value => value - 1)}><ChevronLeft size={16} /></button><span>Page {pagePath ? Number(pagePath.split("/").pop()?.replace(".svg", "")) : "—"}</span><button aria-label="Next Quran page" disabled={pageIndex >= pages.length - 1} onClick={() => setPageIndex(value => value + 1)}><ChevronRight size={16} /></button></div></div>
+            <div className="reader-footer"><div className="legend"><span><i className="correct" />{c("Heard", "مطابق")}</span><span><i className="missed" />{c("Not matched", "غير مطابق")}</span><span><i className="pending" />{c("Not reached", "لم تصل إليه")}</span></div>{mode === "mushaf" && <div className="page-controls"><button aria-label={c("Previous Quran page", "الصفحة السابقة")} disabled={pageIndex === 0} onClick={() => setPageIndex(n => n - 1)}><ChevronLeft size={16} /></button><span>{c("Page", "صفحة")} {pagePath ? Number(pagePath.split("/").pop()?.replace(".svg", "")) : "—"}</span><button aria-label={c("Next Quran page", "الصفحة التالية")} disabled={pageIndex >= pages.length - 1} onClick={() => setPageIndex(n => n + 1)}><ChevronRight size={16} /></button></div>}</div>
           </section>
-
           <aside className="session-panel">
             <ServiceStatus />
-            <section className="listening-card"><div className="panel-heading"><span><span className="status-dot" /> {recitation.state === "complete" ? "SESSION COMPLETE" : active ? "LIVE RECITATION" : "RECITATION COMPANION"}</span><Headphones size={17} /></div>
-              <div className={`mic-orbit ${recitation.state === "listening" ? "is-listening" : ""}`}><div className="orbit-ring" /><div className="mic-core">{recitation.state === "complete" ? <Check size={31} /> : <Mic size={29} />}</div><span className="orbit-star">✦</span></div>
-              <h2>{recitation.state === "connecting" ? "Connecting to your model…" : recitation.state === "stopping" ? "Finishing your recitation…" : recitation.state === "complete" ? "A beautiful step forward." : recitation.state === "listening" ? "We’re listening." : "Your voice. Your journey."}</h2>
-              <p>{recitation.state === "complete" ? "Take a moment to reflect, then return to the ayahs that need a little care." : active ? "Keep reciting naturally. Your place follows you, one ayah at a time." : "Take a breath, make your intention, and begin whenever you’re ready."}</p>
-              <div className="waveform" aria-hidden="true">{Array.from({ length: 39 }, (_, i) => <span key={i} style={{ height: `${5 + (active ? recitation.level * (14 + Math.sin(i * 1.7) * 12 + Math.sin(i * 0.4) * 12) : 0)}px`, opacity: active ? 0.45 + recitation.level * 0.55 : 0.25 }} />)}</div>
-              <button className={`start-button ${active ? "recording" : ""}`} disabled={loading || !surah || Boolean(loadError) || recitation.state === "stopping"} onClick={() => active ? recitation.stop() : void recitation.start()}>{active ? <Square size={15} fill="currentColor" /> : <Mic size={18} />}{recitation.state === "connecting" ? "Cancel" : recitation.state === "stopping" ? "Processing…" : active ? "Finish recitation" : recitation.state === "complete" ? "Recite again" : "Begin recitation"}{!active && <ArrowRight size={17} />}</button>
-              <input ref={audioInput} type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac" hidden aria-label="Choose audio recording" onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void recitation.start(file); }} />
-              <button className="upload-button" disabled={active || loading || !surah || Boolean(loadError)} onClick={() => audioInput.current?.click()}><Upload size={15} /> Upload audio to test</button>
-              {recitation.fileName && <div className="upload-file-note" title={recitation.fileName}><strong>{recitation.fileName}</strong><span>Silent replay · real model results</span></div>}
-              <div className="privacy-note"><ShieldCheck size={13} /> Audio stays on your machine. Always.</div>
-              {!active && recitation.state !== "complete" && <button className="demo-link" disabled={!surah || loading} onClick={recitation.startDemo}><Play size={12} /> Try the presentation demo</button>}
+            <section className="listening-card"><div className="panel-heading"><span>{c(active ? "LIVE RECITATION" : "RECITATION COMPANION", active ? "تلاوة مباشرة" : "رفيق التلاوة")}</span><Headphones size={17} /></div><div className={`mic-orbit ${recitation.state === "listening" ? "is-listening" : ""}`}><div className="orbit-ring" /><div className="mic-core">{recitation.state === "complete" ? <Check size={31} /> : <Mic size={29} />}</div></div>
+              <h2>{c(recitation.state === "connecting" ? "Connecting to your model…" : recitation.state === "stopping" ? "Finishing your recitation…" : recitation.state === "complete" ? "A beautiful step forward." : recitation.state === "listening" ? "We’re listening." : "Your voice. Your journey.", recitation.state === "connecting" ? "جارٍ الاتصال بالنموذج…" : recitation.state === "stopping" ? "جارٍ إنهاء التلاوة…" : recitation.state === "complete" ? "خطوة جميلة إلى الأمام." : recitation.state === "listening" ? "نستمع إليك." : "صوتك، ورحلتك.")}</h2><p>{c(active ? "Keep reciting naturally. Your place follows you, one ayah at a time." : "Take a breath and begin whenever you’re ready.", active ? "تابع التلاوة بطبيعتك؛ نتابع موضعك آية بآية." : "خذ نفسًا وابدأ حين تكون مستعدًا.")}</p>
+              <div className="waveform" aria-hidden="true">{Array.from({ length: 39 }, (_, i) => <span key={i} style={{ height: `${5 + (active ? recitation.level * (14 + Math.sin(i * 1.7) * 12) : 0)}px` }} />)}</div>
+              <button className={`start-button ${active ? "recording" : ""}`} disabled={loading || !surah || Boolean(loadError) || recitation.state === "stopping"} onClick={() => { stopAudio(); if (active) recitation.stop(); else void recitation.start(); }}>{active ? <Square size={15} /> : <Mic size={18} />}{c(recitation.state === "connecting" ? "Cancel" : recitation.state === "stopping" ? "Processing…" : active ? "Finish recitation" : recitation.state === "complete" ? "Recite again" : "Begin recitation", recitation.state === "connecting" ? "إلغاء" : recitation.state === "stopping" ? "جارٍ المعالجة…" : active ? "إنهاء التلاوة" : recitation.state === "complete" ? "اتلُ مرة أخرى" : "ابدأ التلاوة")}</button>
+              <input ref={audioInput} type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac" hidden aria-label={c("Choose audio recording", "اختر تسجيلًا صوتيًا")} onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) { stopAudio(); void recitation.start(file); } }} />
+              <button className="upload-button" disabled={active || loading || !surah || Boolean(loadError)} onClick={() => audioInput.current?.click()}><Upload size={15} />{c("Upload audio to test", "ارفع تسجيلًا للتجربة")}</button>
+              {recitation.fileName && <div className="upload-file-note"><strong>{recitation.fileName}</strong><span>{c("Silent replay · real model results", "إعادة تشغيل صامتة · نتائج حقيقية للنموذج")}</span></div>}
+              <div className="privacy-note"><ShieldCheck size={13} />{c("Inference is local. Reference listening uses cached audio.", "الاستدلال محلي، والاستماع يستخدم المقاطع المحفوظة.")}</div>
+              {!active && recitation.state !== "complete" && <button className="demo-link" disabled={!surah || loading} onClick={recitation.startDemo}><Play size={12} />{c("Try the presentation demo", "جرّب العرض التوضيحي")}</button>}
             </section>
-
-            <section className="progress-card"><div className="section-heading"><h3>Your session</h3><button className="icon-button" aria-label="Reset session" title="Reset session" disabled={active} onClick={recitation.reset}><RotateCcw size={15} /></button></div><div className="progress-title"><strong>{finalized.length}<span> / {surah?.ayahCount || 7} ayahs</span></strong><span>{progress}%</span></div><div className="progress-track"><span style={{ width: `${progress}%` }} /></div><div className="stat-row"><div><span className="stat-icon green"><CheckCircle2 size={15} /></span><strong>{heardWords}</strong><span>Heard words</span></div><div><span className="stat-icon red"><CircleHelp size={15} /></span><strong>{omittedWords}</strong><span>Omitted words</span></div><div><span className="stat-icon gray"><Moon size={15} /></span><strong>{`${Math.floor(recitation.seconds / 60)}:${String(recitation.seconds % 60).padStart(2, "0")}`}</strong><span>Time</span></div></div></section>
-
-            <section className="current-card"><div className="section-heading"><h3>{recitation.state === "complete" ? "Session reflection" : "Your place"}</h3><span className="mini-pill">{current ? `Ayah ${current}` : "Complete"}</span></div>{currentAyah ? <p lang="ar" dir="rtl" className="current-text"><AyahWords ayah={currentAyah} result={results[currentAyah.ayah]} /></p> : <p className="reflection-text">{heardWords} words matched. {omittedWords ? `${omittedWords} to revisit gently.` : "May your practice bring you closer."}</p>}<div className="current-hint"><ArrowDown size={14} /><span>{active ? "The last word moves you to the next ayah" : "Start with the first ayah, and follow your flow"}</span></div></section>
+            <section className="progress-card"><div className="section-heading"><h3>{c("Your session", "جلستك")}</h3><button className="icon-button" aria-label={c("Reset session", "أعد ضبط الجلسة")} disabled={active} onClick={recitation.reset}><RotateCcw size={15} /></button></div><div className="progress-title"><strong>{finalized.length}<span> / {surah?.ayahCount || 7} {c("ayahs", "آيات")}</span></strong><span>{progress}%</span></div><div className="progress-track"><span style={{ width: `${progress}%` }} /></div><div className="stat-row"><div><CheckCircle2 size={15} /><strong>{heardWords}</strong><span>{c("Heard words", "كلمات مطابقة")}</span></div><div><CircleHelp size={15} /><strong>{omittedWords}</strong><span>{c("Unmatched words", "كلمات غير مطابقة")}</span></div><div><strong>{Math.floor(recitation.seconds / 60)}:{String(recitation.seconds % 60).padStart(2, "0")}</strong><span>{c("Time", "الوقت")}</span></div></div></section>
+            <section className="current-card"><div className="section-heading"><h3>{c("Your place", "موضعك")}</h3><span className="mini-pill">{current ? c(`Ayah ${current}`, `الآية ${current}`) : c("Complete", "اكتملت")}</span></div>{currentAyah && (mode === "phonetic" ? <p className="current-phonetic" lang="en" dir="ltr">{qaloonG2P(currentAyah.text).text}</p> : <p lang="ar" dir="rtl" className="current-text"><AyahWords ayah={currentAyah} result={results[currentAyah.ayah]} lang={lang} /></p>)}<p className="current-hint">{c("Matching tracks recognized text, not pronunciation or tajweed correctness.", "المطابقة تتابع النص المتعرَّف عليه، وليست حكمًا على النطق أو التجويد.")}</p></section>
           </aside>
         </div>
-        {currentAyah && <TafsirPanel surah={selected} ayah={currentAyah.ayah} />}
-
-        <section className="insight-row"><div className="insight-card"><span className="insight-icon"><Sparkles size={19} /></span><div><h3>Presence, not perfection.</h3><p>A missed ayah won’t interrupt you. Keep your flow, then come back with care.</p></div></div><div className="model-status"><span className="model-dot" /><div><strong>{recitation.demo ? "Simulated presentation" : "Whisper base · Qālūn"}</strong><span>{recitation.device === "cuda" ? "GPU connected" : recitation.device === "cpu" ? "CPU connected" : "Local model"} · 65% text-match threshold{agreement !== null ? ` · ${agreement}% session agreement` : ""}</span></div></div></section>
-        {recitation.update?.transcript && <section className="transcript-card"><span className="field-label">{recitation.demo ? "SIMULATED TRANSCRIPT" : "WHAT THE MODEL HEARD"}</span><p lang="ar" dir="rtl">{recitation.update.transcript}</p>{recitation.update.latency_ms && <span className="decode-time">Last decode: {recitation.update.latency_ms} ms</span>}</section>}
-        <footer className="footer"><span><Leaf size={13} /> Made for mindful recitation.</span><span>Recognition aid, not a tajweed assessment. <button onClick={() => setHelp(true)}>Learn more</button></span></footer>
+        {currentAyah && mode !== "meaning" && <TafsirPanel surah={selected} ayah={currentAyah.ayah} />}
+        {recitation.update?.transcript && <section className="transcript-card"><span className="field-label">{c(recitation.demo ? "SIMULATED TRANSCRIPT" : "WHAT THE MODEL HEARD", recitation.demo ? "نص محاكاة" : "ما تعرَّف عليه النموذج")}</span><p lang="ar" dir="rtl">{recitation.update.transcript}</p></section>}
+        <footer className="footer"><span><Leaf size={13} />{c("Made for mindful recitation.", "للتلاوة بتدبر.")}</span><span>{c("Recognition aid, not a tajweed assessment.", "وسيلة تعرف صوتي، وليست تقييمًا للتجويد.")} <button onClick={() => setHelp(true)}>{c("Learn more", "اعرف المزيد")}</button></span></footer>
       </main>
     </div>
-
-    {picker && <div className="modal-backdrop" onClick={() => setPicker(false)}><section className="modal surah-modal" role="dialog" aria-modal="true" aria-labelledby="surah-modal-title" onClick={e => e.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">BEGIN A NEW CHAPTER</span><h2 id="surah-modal-title">Choose your surah</h2></div><button className="icon-button" aria-label="Close surah picker" onClick={() => setPicker(false)}><X size={21} /></button></div><label className="search-field"><Search size={18} /><input autoFocus value={query} onChange={e => setQuery(e.target.value)} placeholder="Search name or surah number…" aria-label="Search surahs" /></label><p className="picker-note">All Quran text is local. <span className="trained-label">Trained</span> marks the model’s 38-surah coverage.</p><div className="surah-list">{filtered.map(s => <button className={selected === s.id ? "chosen" : ""} key={s.id} onClick={() => selectSurah(s.id)}><span className="list-number">{String(s.id).padStart(2, "0")}</span><div><strong>{s.name}</strong><span>{s.ayahCount} ayahs {s.trained && <em>Trained</em>}</span></div><span className="list-arabic" lang="ar">{s.arabic}</span>{selected === s.id ? <Check size={17} /> : <ChevronRight size={17} />}</button>)}{!filtered.length && <p className="empty-search">No surahs match your search.</p>}</div></section></div>}
-    {help && <div className="modal-backdrop" onClick={() => setHelp(false)}>
-      <section className="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title" onClick={e => e.stopPropagation()}>
-        <div className="modal-heading"><div><span className="eyebrow">A GENTLE COMPANION</span><h2 id="help-title">Keep your recitation flowing.</h2></div><button className="icon-button" aria-label="Close help" onClick={() => setHelp(false)}><X size={21} /></button></div>
-        <ol className="help-steps">
-          <li><span>01</span><div><h3>Choose a surah</h3><p>Your session begins with the first Qālūn ayah. Fātiḥah’s basmalah is an unnumbered introduction. Recite live or upload a recording for silent testing.</p></div></li>
-          <li><span>02</span><div><h3>Follow each word</h3><p>Matched words turn green individually. Confirmed omissions turn red; words you have not reached stay gray. Pausing halfway through an ayah does not mark its remaining words omitted.</p></div></li>
-          <li><span>03</span><div><h3>Keep your flow</h3><p>A stable last-word match advances your place. Recognizing a later ayah confirms skipped words without stopping you. At 65% ordered word agreement, the ayah summary counts as matched, but individual omitted words still stay red.</p></div></li>
-        </ol>
-        <div className="help-note"><ShieldCheck size={22} /><p>Scores compare recognized words with the expected text. They are not model probabilities, pronunciation verification, or tajweed judgments. A qualified teacher remains essential. Word colors use Qālūn Ayah view; the supplied SVG artwork only has whole-ayah polygons.</p></div>
-        <button className="start-button" onClick={() => setHelp(false)}>Return to your quiet space <ArrowRight size={17} /></button>
-      </section>
-    </div>}
+    {picker && <div className="modal-backdrop" onClick={() => setPicker(false)}><section className="modal surah-modal" role="dialog" aria-modal="true" aria-labelledby="surah-modal-title" onClick={e => e.stopPropagation()}><div className="modal-heading"><h2 id="surah-modal-title">{c("Choose your surah", "اختر السورة")}</h2><button className="icon-button" aria-label={c("Close surah picker", "أغلق قائمة السور")} onClick={() => setPicker(false)}><X size={21} /></button></div><label className="search-field"><Search size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder={c("Search name or surah number…", "ابحث باسم السورة أو رقمها…")} aria-label={c("Search surahs", "ابحث عن سورة")} /></label><p className="picker-note">{c("All Quran text is local. Trained marks the 38-surah speech-model scope.", "نص القرآن محفوظ محليًا. «مدرَّب» يحدد نطاق النموذج الصوتي: ٣٨ سورة.")}</p><div className="surah-list">{filtered.map(s => <button className={selected === s.id ? "chosen" : ""} key={s.id} onClick={() => selectSurah(s.id)}><span className="list-number">{String(s.id).padStart(2, "0")}</span><div><strong>{lang === "ar" ? s.arabic : s.name}</strong><span>{s.ayahCount} {c("ayahs", "آيات")} {s.trained && <em>{c("Trained", "مدرَّب")}</em>}</span></div><span className="list-arabic" lang="ar">{s.arabic}</span>{selected === s.id ? <Check size={17} /> : <ChevronRight size={17} />}</button>)}</div></section></div>}
+    {help && <div className="modal-backdrop" onClick={() => setHelp(false)}><section className="modal help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title" onClick={e => e.stopPropagation()}><div className="modal-heading"><h2 id="help-title">{c("Keep your recitation flowing.", "حافظ على سلاسة تلاوتك.")}</h2><button className="icon-button" aria-label={c("Close help", "أغلق المساعدة")} onClick={() => setHelp(false)}><X size={21} /></button></div><ol className="help-steps">
+      <li><span>01</span><div><h3>{c("Choose a surah", "اختر سورة")}</h3><p>{c("Choose your starting Qālūn ayah. Fātiḥah’s basmalah is an unnumbered introduction. Listen with Al-Huthaify by default or choose a different Qālūn reader.", "اختر آية البداية برواية قالون. البسملة في الفاتحة مقدمة غير مرقمة. القارئ الافتراضي الحذيفي، ويمكن اختيار قارئ آخر بقالون.")}</p></div></li>
+      <li><span>02</span><div><h3>{c("Choose your reading view", "اختر طريقة القراءة")}</h3><p>{c("SVG artwork, Arabic, large phonetics, or meanings with phonetics. Recording disables reference playback to avoid scoring the reference audio.", "مصحف مصوّر، أو نص عربي، أو نقل صوتي كبير، أو معانٍ مع النقل الصوتي. يُوقف الاستماع المرجعي أثناء التسجيل حتى لا نقيس صوت القارئ بدلًا من صوتك.")}</p></div></li>
+      <li><span>03</span><div><h3>{c("Understand the colors", "افهم الألوان")}</h3><p>{c("Speech-match backgrounds and draft tajweed letter colors are separate. Tajweed lengths are harakat, not seconds; natural madd is 2, not universally 4.", "خلفيات المطابقة منفصلة عن ألوان حروف التجويد التجريبية. أطوال المد بالحركات لا بالثواني؛ الطبيعي حركتان وليس دائمًا أربعًا.")}</p></div></li>
+    </ol><div className="help-note"><ShieldCheck size={22} /><p>{c("Scores compare recognized words with expected text. They are not model probabilities, pronunciation verification, or tajweed judgments. Draft phonetics and tajweed require a qualified Qālūn teacher. SVG artwork is not a certified Qālūn mushaf.", "الدرجات تقارن النص المتعرَّف عليه بالنص المتوقع، وليست احتمالات النموذج أو إثباتًا لصحة النطق والتجويد. النقل الصوتي وعلامات التجويد بحاجة إلى معلم مؤهل بقالون. الصور ليست مصحف قالون معتمدًا.")}</p></div><button className="start-button" onClick={() => setHelp(false)}>{c("Return to your quiet space", "عُد إلى مساحة التلاوة")}<ArrowRight size={17} /></button></section></div>}
   </div>;
 }

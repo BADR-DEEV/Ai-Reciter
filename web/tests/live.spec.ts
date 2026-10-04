@@ -13,6 +13,8 @@ test("microphone worklet streams real audio to local GPU", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Begin recitation", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Begin recitation", exact: true }).click();
   await expect(page.getByRole("heading", { name: "We’re listening." })).toBeVisible();
+  await expect(page.getByLabel("Reference reciter")).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Listen to ayah 1", exact: true })).toBeDisabled();
   await expect(page.locator('.text-ayah[data-ayah="1"]')).toHaveClass(/correct/, { timeout: 18000 });
   await expect(page.locator('.text-ayah[data-ayah="2"]')).toHaveClass(/missed/, { timeout: 15000 });
   await expect(page.locator('.text-ayah[data-ayah="1"] .quran-word.correct')).toHaveCount(4);

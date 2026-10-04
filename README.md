@@ -10,6 +10,9 @@ Whisper model in `runs/gpu_base_full`. Includes live microphone streaming and a
 
 ## Start
 
+**Reviewers:** see [`docs/REVIEWER_GUIDE.md`](docs/REVIEWER_GUIDE.md) for active
+entry points, setup/check commands and release gates.
+
 Requires Node.js 22 LTS or newer and the Python/CUDA environment used for training.
 Do not replace your working CUDA PyTorch build with a CPU wheel.
 
@@ -17,6 +20,8 @@ Do not replace your working CUDA PyTorch build with a CPU wheel.
 # Repository root: install the API dependencies and cache the Quran once.
 python -m pip install -r src/streaming/requirements.txt
 python src/dataset_collection/cache_quran_pages.py
+# Only if runs/gpu_base_full is missing, with authorized private-Hub access:
+python src/deployment/restore_local_full.py
 
 # Terminal 1 — local inference (model loads once, not per request)
 python -m uvicorn src.streaming.server:app --host 127.0.0.1 --port 8000 --ws-max-size 16384
@@ -40,8 +45,10 @@ green matches, a red omission, gray unreached ayahs, and uninterrupted progressi
 The demo is not a claim about measured model performance.
 
 For a production presentation build: `npm run build`, then `npm start` in `web`.
-Stop `npm run dev` first; do not run development and production builds against
-the same `.next` directory simultaneously.
+Stop the frontend on port 3000 before starting another server on that port.
+Development uses `.next-dev`; production build/start use `.next-production`, so
+development compilation cannot invalidate presentation bundles. Do not build
+against an actively running production server; stop it before rebuilding.
 The app and API bind to loopback by default. `/health` on port 8000 reports the
 loaded model, CUDA/CPU device, and active sessions.
 
@@ -131,25 +138,40 @@ including one simulated within-ayah omission.
 - `/profile`: name + **demo password** stored only as a salted PBKDF2 hash in
   localStorage, with per-profile progress. This is not real authentication;
   never reuse a real password. No cloud sync or recovery.
-- Studio: choose a starting/resume ayah and enable **draft Qālūn phonetics**.
+- Studio: shared top navigation, starting/resume ayah, SVG/Arabic/**large
+  phonetics**/meaning-with-phonetics views and per-ayah listening. **Al-Huthaify is
+  the default**; select Al-Husary or Al-Dokali for their own validated Qālūn clips.
+  Playback is disabled during studio recording; missing audio never substitutes
+  a different reader or riwāyah.
   The rules use the vocalized Qālūn source, not copied Hafs Latin text.
   No entries are claimed scholar-approved. Read the audit before teaching.
 - Meaning/tafsir: Arabic tafsir and English **translation of meanings** from
   Quran Tafseer API, behind a server-side proxy with numbering alignment,
-  attribution and failure handling. Only opening the panel triggers lookup.
+  attribution and failure handling. Panels load on opening; inline meanings
+  load only when their ayahs become visible. Arabic switching updates UI direction
+  and commentary language. Detailed course teaching content remains labeled English.
   Commentary is not a replacement riwāyah-specific recitation text.
 
-Generate the acoustic distractor index (565 aligned clips in this dataset):
+Generate the default reader's acoustic distractor index and whole-Quran tajweed draft:
 
 ```powershell
 python src/learning/build_audio_similarity.py
+python src/learning/build_qalon_tajweed.py
 cd web
 npm.cmd run phonetics:audit
 ```
 
-Local audio quizzes need the existing Al-Husary dataset; no Hafs recordings are
+Local audio/listening defaults to the existing Huthaify dataset; no Hafs recordings are
 substituted. Without the generated index, difficulty explicitly falls back to
 text similarity. MFCC similarity is a heuristic, not a phoneme/tajweed model.
+Alternate indexes: `--reciter husary` / `--reciter dokali` with the matching datasets.
+The generated `web/public/quran/qalon_majwad_mushaf.json` covers all source ayahs,
+but is **unapproved machine candidates**, not a certified mushaf. Natural madd is
+**2 ḥarakāt**, necessary madd **6**, not fixed seconds; other choices require
+route/context review. Colors are off by default. See the reviewer guide.
+
+New-reader collection/segmentation and restrictions:
+[`docs/AUDIO_SEGMENTATION_REVIEW.md`](docs/AUDIO_SEGMENTATION_REVIEW.md).
 
 Analysis and next priorities: [`docs/ACCURACY_AND_PRODUCT_PLAN.md`](docs/ACCURACY_AND_PRODUCT_PLAN.md).
 Phonetics review guide: [`docs/QALOON_PHONETICS_AUDIT.md`](docs/QALOON_PHONETICS_AUDIT.md).
@@ -171,6 +193,7 @@ Full generated spreadsheet: `docs/generated/qaloon-phonetics-audit.csv`.
 ```powershell
 python -m unittest src.streaming.test_matcher -v
 python -m unittest src.dataset_collection.test_quran_geometry -v
+python -m unittest src.learning.test_tajweed src.learning.test_review_audio -v
 python -m src.streaming.replay_audio --surah 1 --audio fatiha.wav
 cd web
 npm run typecheck
