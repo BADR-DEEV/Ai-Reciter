@@ -1,6 +1,6 @@
 export type TajweedSpan = { start: number; end: number; rule: string; status: "needs-review"; context_note: string };
 export type TajweedAyah = { ayah: number; text: string; spans: TajweedSpan[]; warnings: string[]; status: string };
-export type TajweedMushaf = { status: string; approved_ayahs: number; rules: Record<string, { en: string; ar: string; color: string; harakat: number[] | null }>; surahs: { id: number; ayahs: TajweedAyah[] }[] };
+export type TajweedMushaf = { status: string; approved_ayahs: number; rules: Record<string, { en: string; ar: string; color: string; group?: string; harakat: number[] | null }>; legend?: Record<string, { en: string; ar: string; color: string }>; basmalah?: TajweedAyah; surahs: { id: number; ayahs: TajweedAyah[] }[] };
 
 export function tajweedSegments(text: string, spans: TajweedSpan[], start: number, end: number) {
   const relevant = spans.filter(s => s.start < end && s.end > start && s.start >= 0 && s.end <= text.length);

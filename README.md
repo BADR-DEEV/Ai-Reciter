@@ -13,6 +13,12 @@ Whisper model in `runs/gpu_base_full`. Includes live microphone streaming and a
 **Reviewers:** see [`docs/REVIEWER_GUIDE.md`](docs/REVIEWER_GUIDE.md) for active
 entry points, setup/check commands and release gates.
 
+**Audio preparation:** [`docs/AUDIO_SEGMENTATION_REVIEW.md`](docs/AUDIO_SEGMENTATION_REVIEW.md)
+describes the single-file slicer, shared madd boundaries, reversible noise cleaning
+and the consolidated `review_bundle.json`. **New training experiments:**
+[`docs/TARTEEL_QALOON_TRAINING.md`](docs/TARTEEL_QALOON_TRAINING.md) covers the
+three-reader Tarteel/OpenAI-base comparison and approval/permission-gated Trabulsi.
+
 Requires Node.js 22 LTS or newer and the Python/CUDA environment used for training.
 Do not replace your working CUDA PyTorch build with a CPU wheel.
 
@@ -24,7 +30,9 @@ python src/dataset_collection/cache_quran_pages.py
 python src/deployment/restore_local_full.py
 
 # Terminal 1 — local inference (model loads once, not per request)
-python -m uvicorn src.streaming.server:app --host 127.0.0.1 --port 8000 --ws-max-size 16384
+python -m src.streaming.serve --model gpu-full-base
+# Or the new private DeepDML-trained adapter:
+python -m src.streaming.serve --model deepdml
 
 # Terminal 2 — interface
 cd web
@@ -177,9 +185,209 @@ Analysis and next priorities: [`docs/ACCURACY_AND_PRODUCT_PLAN.md`](docs/ACCURAC
 Phonetics review guide: [`docs/QALOON_PHONETICS_AUDIT.md`](docs/QALOON_PHONETICS_AUDIT.md).
 Full generated spreadsheet: `docs/generated/qaloon-phonetics-audit.csv`.
 
+## Fine-tune Tarteel Whisper-base or Whisper-tiny on Qālūn
+
+Both entry points fully adapt **Tarteel's existing weights**, defaulting to
+**Dokali + Huthaify + Husary**, canonical Qālūn labels, seed 42 and Fātiḥah/Juz
+ʿAmma scope. **Trabulsi is excluded unless explicitly admitted below.** Tarteel's
+upstream corpus is undocumented; Hafs/Qālūn transfer and pretraining overlap need
+evaluation. WER does not certify pronunciation or madd/tajweed.
+
+Use your existing CUDA PyTorch/torchaudio environment; do not replace its CUDA
+wheel. Choose a **new** output directory for each run. Nothing uploads/deploys.
+
+```powershell
+python -m pip install -r src/training_with_gpu/requirements.txt
+python src/training_with_gpu/train_tarteel_base.py --dry-run
+python src/training_with_gpu/train_tarteel_tiny.py --dry-run
+
+# WITHOUT Trabulsi (default). Run one GPU job at a time.
+python src/training_with_gpu/train_tarteel_base.py --output-dir runs/tarteel_base_three_reader
+python src/training_with_gpu/train_tarteel_tiny.py --output-dir runs/tarteel_tiny_three_reader
+
+# Optional short implementation check, not an accuracy benchmark.
+python src/training_with_gpu/train_tarteel_tiny.py --output-dir runs/tarteel_tiny_smoke --max-steps 1 --max-samples-per-split 6 --batch-size 2 --gradient-accumulation 1
+```
+
+### Repair and validate Trabulsi before including it
+
+**Requested experiment history:** the user chose **LoRA**, not a new full-layer
+fine-tune. See [AI approaches and the current run](docs/AI_APPROACHES_AND_CURRENT_RUN.md)
+for the launched Tarteel-base recipe, actual four-reader membership, recording-safe
+splits, withheld Waleed test, added metrics and honest full-model comparison.
+Taha was rebuilt and excluded from v1; its later user-directed private-research
+inclusion is documented in the repair recipe below. See the
+[project map](docs/PROJECT_MAP.md) for authoritative dataset paths and preserved
+historical assets. Experimental acceptance does not create production approvals.
+
+The first LoRA run has **completed, not been deployed**: **61.46% test WER** and
+**9.43% Waleed adaptation-held-out WER**, with severe repetition failures.
+See [completed results and comparison caveats](docs/TARTEEL_LORA_V1_RESULTS.md).
+
+The subsequent requested repair adds a **five-reader private research recipe**,
+canonical vowelled Qaloon targets, development-only decoder controls, pinned
+adapter/config reload and abstention on unreliable decoding. See
+[the measured repair findings](docs/TARTEEL_DECODE_REPAIR.md): plain beam search
+helped v1, but a “true 7%” human-ready result is not assumed or advertised.
+The selected v2 adapter's evaluation was recovered without retraining after a
+post-export process exit: **3.80% test WER / 5.49% adaptation-held-out Waleed WER**,
+zero flagged loops/EOS failures on those partitions. Its development advantage
+over unadapted Tarteel is only one word error; it remains a **private candidate,
+not validated learner grading or an approved deployment**. See
+[v2 results](docs/TARTEEL_LORA_V2_RESULTS.md).
+
+The later [DeepDML upgrade](docs/DEEPDML_QALOON_UPGRADE.md) fixes verified
+vocative/consonantal-yaa normalization bugs with immutable versioned overlays,
+adds fitting-only boundary quarantine, rank32 all-projection LoRA and base/small
+12GB BF16 recipes, and separates blind omission evaluation from optional surah-word
+trie assistance. Screenshot benchmarks remain unverified, not promised results.
+
+**New reader UI and segmentation experiment:** translation/tafsir now occupy a
+left sidebar; Arabic/phonetics use a WAV-hash-bound square word cursor when real
+timing proposals are available, and Mushaf uses whole-ayah highlighting. See
+[playback and the pinned Tarteel-base experiment](docs/PLAYBACK_AND_TARTEEL_SEGMENTATION.md)
+for timing-generation and `--model tarteel-base` commands, concrete aḥkām fixes,
+and the actual failed pilot results (no automatic replacement of better cuts).
+
+**Latest terminal-word guard:** the earlier `dataset_qaloon_trabulsi_repaired/`
+outputs below are now historical; a listener found leaked `طوى` at 79:16→17 that
+ASR had failed to report. Do **not** treat the older automatic pass list as proof
+of acoustic boundaries. See
+[the updated completeness contract](docs/AUDIO_SEGMENTATION_REVIEW.md#terminal-word-leakage-and-the-569-row-contract)
+and regenerate in a new directory using the current slicer.
+
+Current runs write:
+
+- `metadata.jsonl`: actual exported, auto-checked WAVs with the other readers'
+  usual schema; **not padded** with absent/duplicate/partial clips.
+- `coverage.jsonl`: exactly **569 canonical rows** for a full Fātiḥah/Juz ʿAmma
+  run, including explicit unresolved rows with null audio fields and reasons.
+  This is **not training metadata** and cannot substitute for 569 valid WAVs.
+- `review_audio/*.candidate.wav`: retained uncertain boundary proposals rather
+  than silently discarding them, plus wider `*.context.wav` files.
+
+The slicer now exits **2 for incomplete coverage**, unless `--allow-incomplete`
+explicitly requests a review pilot. `--surahs 79` expects 45 rows, not 569. The
+validator defaults to **all 569 expected IDs**, including wholly absent surahs:
+
+```powershell
+python src/dataset_collection/validate_ayah_audio.py --dataset PATH_TO_NEW_TRABULSI_OUTPUT --output-dir data/segmentation_review/trabulsi_latest_audit --expected-reciter trabulsi --expected-scope fatiha-juz-amma
+```
+
+Zero training approvals are implied by either file's line count. No automatic
+pipeline here promises perfect cuts; unresolved phonemes/orthography need qualified
+listening/alignment review. Reviewer-authored, source-hashed frame corrections
+can be supplied using `--boundary-overrides` (documented in the review guide).
+
+**Latest local output:** `dataset_qaloon_trabulsi_terminal_guarded_v2/` has 289
+auto-checked, unapproved WAV pairs plus a **569-row `coverage.jsonl`**. The full
+run at `data/segmentation_review/trabulsi-terminal-v4-full/` also retains 134
+uncertain complete-cut proposals and 209 wider contexts. **280 references remain
+withheld**; the actual 569-WAV dataset is **not complete yet**. Additional shared-
+boundary quarantine is intentional, not a claim that those ayahs are absent.
+The independent exported-WAV audit at
+`data/segmentation_review/trabulsi-terminal-v4-validation-v2/validation.json`
+has **256 automatic passes / 33 voiced-start review flags**, with **no text
+disagreements**. Every shared-start dependency has recorded predecessor-end
+evidence; rejecting a predecessor's start does not mechanically invalidate its
+separately verified end or quarantine all later ayahs.
+
+**Do not train on `dataset_qaloon_trabulsi/` as it stands.** Its reciter field says
+Taha incorrectly, and old cuts can contain half an ayah or the preceding tail.
+The audit confirmed `112:3` transcribes **`لم يلد`**, while the label is **`لم يلد
+ولم يولد`**; the missing phrase leaks into `112:4`. Originals are preserved.
+
+**Already generated locally:** `dataset_qaloon_trabulsi_repaired/` has 333
+raw/cleaned candidate pairs and a single `review_bundle.json` covering all 569
+scoped reference decisions. The exported-WAV audit at
+`data/segmentation_review/trabulsi-repaired-validation-v2/validation.json` has
+**302 automatic passes / 31 review flags**; all four Ikhlāṣ ayahs pass. **236
+references remain withheld**, not assumed absent. This is not a complete,
+human-approved dataset. Start review with those existing files rather than
+recreating them; the commands below demonstrate reproducible runs in NEW folders.
+
+```powershell
+python -m pip install -r src/learning/requirements-review.txt
+
+# Optional original audit. Exit 2 means QA failures/partial audit, not a crash.
+python src/dataset_collection/validate_ayah_audio.py --dataset dataset_qaloon_trabulsi --output-dir data/segmentation_review/trabulsi_old_audit --expected-reciter trabulsi
+
+# Verify local full-surah MP3s against official Trabulsi Qaloon recording links.
+python src/dataset_collection/verify_mp3quran_trabulsi.py --input-dir ahmad_tarabulsi/mp3 --output-dir data/review_sources/trabulsi_direct
+
+# Rebuild complete ayahs, including internal pauses; never guess missing words.
+python src/dataset_collection/segment_and_slice.py --input-dir ahmad_tarabulsi/mp3 --output-dir data/segmentation_review/trabulsi_rebuild --model large-v3 --compute-type int8_float16 --reciter "Ahmad Al-Trabulsi (Qaloon)" --reciter-key trabulsi --content-match exact
+python src/dataset_collection/prepare_trabulsi_review.py --candidates data/segmentation_review/trabulsi_rebuild --source-inventory data/review_sources/trabulsi_direct/source_inventory.json --output-dir dataset_qaloon_trabulsi_corrected_new
+
+# Re-read exported WAVs; require exact normalized word sequences.
+python src/dataset_collection/validate_ayah_audio.py --dataset dataset_qaloon_trabulsi_corrected_new --output-dir data/segmentation_review/trabulsi_corrected_audit --expected-reciter trabulsi
+```
+
+The validator writes **`validation.json`**, readable `validation.csv` and a blank
+`listening_decisions.csv`. It checks canonical labels, PCM16/mono/16kHz, duration,
+silence, clipping/DC offset, voiced cut edges, frame/hash consistency, duplicates,
+orphans and missing references. Blind ASR uses **no expected-text prompt or VAD
+cropping**; partial, extra, repeated or substituted words fail. This is exact
+**after the project's Arabic ASR normalization**, not literal harakat/phoneme
+agreement. ASR can falsely reject good audio or miss an acoustic defect.
+
+To admit only passing clips:
+
+1. A qualified reviewer listens to **raw and cleaned** cuts against the full
+   recording/Qālūn text. Fill `listening_approved` and `boundary_approved` with
+   `true`, plus `reviewer` and `reviewed_at`, only for genuinely approved clips.
+   Leave failures blank/false; never auto-fill approvals from ASR agreement.
+2. Review [MP3Quran's reuse policy](https://www.mp3quran.net/eng/privacy) and create
+   the source-specific permission receipt described in
+   [the training guide](docs/TARTEEL_QALOON_TRAINING.md#direct-mp3quran-source).
+   MP3Quran explicitly permits copying/using its material and links. The verified
+   **direct** source is not the previously restricted Hugging Face collection.
+   Record the responsible training-use decision; public release needs a separate
+   licensing review.
+3. Assemble the reviewed manifest, then supply **all three** admission arguments:
+
+```powershell
+python src/dataset_collection/approve_ayah_audio.py --dataset dataset_qaloon_trabulsi_corrected_new --validation-report data/segmentation_review/trabulsi_corrected_audit/validation.json --decisions data/segmentation_review/trabulsi_corrected_audit/listening_decisions.csv --permission-file PATH_TO_REVIEWED_PERMISSION_JSON
+
+# WITH only approved, exact-validated Trabulsi clips. Inspect the dry-run first.
+python src/training_with_gpu/train_tarteel_base.py --output-dir runs/tarteel_base_with_trabulsi --trabulsi-reviewed-manifest dataset_qaloon_trabulsi_corrected_new/metadata.reviewed.jsonl --trabulsi-validation-report data/segmentation_review/trabulsi_corrected_audit/validation.json --trabulsi-permission-file PATH_TO_REVIEWED_PERMISSION_JSON --dry-run
+python src/training_with_gpu/train_tarteel_tiny.py --output-dir runs/tarteel_tiny_with_trabulsi --trabulsi-reviewed-manifest dataset_qaloon_trabulsi_corrected_new/metadata.reviewed.jsonl --trabulsi-validation-report data/segmentation_review/trabulsi_corrected_audit/validation.json --trabulsi-permission-file PATH_TO_REVIEWED_PERMISSION_JSON --dry-run
+```
+
+Remove `--dry-run` to launch the chosen experiment. If no clips pass **both** QA
+and listening review, omit all Trabulsi arguments and use the three-reader recipe.
+Only the passing, hash-matched subset is admitted, even if other candidates fail.
+All Trabulsi cuts from one recording stay in one partition; this mixed protocol
+is **not** an unseen-ayah benchmark.
+
+### How reliable ayah-by-ayah preparation works
+
+There is no single universal "industry-standard" cutting algorithm. Use
+**recording/reciter-specific** timing annotations or a validated Quran/riwāyah-aware
+aligner, canonical ayah IDs/text, waveform/phoneme boundary refinement, independent
+content checks and human listening review. MP3Quran exposes an
+[ayah timing API](https://www.mp3quran.net/eng/timing-api), but generic timing IDs or
+Hafs numbering must not be assumed compatible with a different voice/Qālūn.
+**A pause is not automatically an ayah boundary:** `لم يلد` can be an internal
+waqf and must remain with `ولم يولد`. Continuous wasl/restarts/ambiguous cuts need
+review, not guessed boundaries. Preserve originals, exact frames, hashes and
+review decisions; avoid aggressive denoising, vowel fades or >30s target truncation.
+
 ## Service configuration
 
-- `RECITER_MODEL_PATH`: full local model directory (default `runs/gpu_base_full`).
+- Select at startup with `python -m src.streaming.serve --model gpu-full-base` or
+  `--model deepdml`. Presets use `runs/gpu_base_full` and
+  `runs/deepdml_qaloon_lora_base_v1/adapter`, respectively. Only one model/worker
+  loads; restart the command to switch. DeepDML selection explicitly enables
+  private experimental staging, not certified learner/tajweed assessment.
+- `--model-path PATH`: override the selected model's location; DeepDML accepts
+  either its parent run or adapter directory. No missing-model fallback.
+- Optional `--device cuda --dtype fp16` (CUDA FP16 is automatic when available);
+  `--beams 1` trades recognition accuracy for faster decoding. Without an override,
+  DeepDML uses its saved beam3 policy and the full model uses greedy decoding.
+  `/health` exposes the active model, precision, beam count and adapter status.
+- `RECITER_MODEL_PATH`: direct-uvicorn model directory override; the launcher
+  sets this for the chosen preset, so no environment-variable setup is needed.
 - `RECITER_ALLOWED_ORIGINS`: comma-separated allowed UI origins; defaults to
   `http://localhost:3000,http://127.0.0.1:3000`. Other origins are rejected.
 - `web/.env.local`: copy `web/.env.example` to override `NEXT_PUBLIC_RECITER_WS`.

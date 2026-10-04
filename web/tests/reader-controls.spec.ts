@@ -13,11 +13,47 @@ test("reader views replace Arabic with large phonetics and retain canonical text
   expect(await page.locator('[data-ayah="3"] .ayah-reading-line').innerText()).toBe(original);
   await page.getByLabel("Draft tajweed colors").check();
   await expect(page.locator(".tajweed-legend")).toBeVisible();
+  await expect(page.locator(".tajweed-palette li")).toHaveCount(8);
+  await expect(page.locator(".tajweed-palette")).toContainText("Necessary madd · 6 counts");
+  await expect(page.locator(".basmalah .tajweed-span").first()).toBeVisible();
   expect(await page.locator('[data-ayah="3"] .ayah-reading-line').innerText()).toBe(original);
   await expect(page.locator(".tajweed-span").first()).toBeVisible();
   await page.locator(".tajweed-legend summary").click();
   await expect(page.locator(".tajweed-legend")).toContainText("Natural madd · 2 harakat");
   await expect(page.locator(".tajweed-legend")).toContainText("Not a certified");
+});
+
+test("tajweed colors preserve Arabic font runs, joins and word widths", async ({ page }) => {
+  await page.goto("/studio");
+  await page.getByRole("button", { name: "Ayah view", exact: true }).click();
+  await expect(page.locator(".ayah-reading-line .quran-word").first()).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  const plain = await page.locator(".ayah-reading-line .quran-word").evaluateAll(words => words.map(word => ({
+    text: word.textContent, width: word.getBoundingClientRect().width, font: getComputedStyle(word).font,
+  })));
+  await page.getByLabel("Draft tajweed colors").check();
+  await expect(page.locator(".ayah-reading-line .tajweed-span").first()).toBeVisible();
+  const colored = await page.locator(".ayah-reading-line .quran-word").evaluateAll(words => words.map(word => ({
+    text: word.textContent, width: word.getBoundingClientRect().width, font: getComputedStyle(word).font,
+    piecesMatch: [...word.children].every(piece => {
+      const parent = getComputedStyle(word), child = getComputedStyle(piece);
+      return child.fontFamily === parent.fontFamily && child.fontWeight === parent.fontWeight
+        && child.fontSize === parent.fontSize && child.display === "inline" && child.letterSpacing === parent.letterSpacing;
+    }),
+  })));
+  expect(colored).toHaveLength(plain.length);
+  colored.forEach((word, index) => {
+    expect(word.text).toBe(plain[index].text);
+    expect(word.font).toBe(plain[index].font);
+    expect(Math.abs(word.width - plain[index].width)).toBeLessThan(.25);
+    expect(word.piecesMatch).toBe(true);
+  });
+  await expect(page.locator(".mushaf-card > .tajweed-legend")).toBeVisible();
+  await page.locator(".lh-lang").click();
+  await expect(page.locator(".tajweed-palette")).toContainText("مد لازم · ٦ حركات");
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: "test-results/tajweed-arabic-mobile.png", fullPage: true });
 });
 
 test("Arabic switch updates direction, dashboard and commentary; reciter persists", async ({ page }) => {

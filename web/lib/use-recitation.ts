@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Surah, Update } from "./types";
 
 type State = "idle" | "connecting" | "listening" | "stopping" | "complete";
-type Resources = { socket?: WebSocket; context?: AudioContext; stream?: MediaStream; node?: AudioWorkletNode; source?: AudioNode; playback?: AudioBufferSourceNode; timer?: ReturnType<typeof setInterval>; heartbeat?: ReturnType<typeof setInterval>; stopTimeout?: ReturnType<typeof setTimeout>; flushTimeout?: ReturnType<typeof setTimeout>; finishing?: boolean };
+type Resources = { socket?: WebSocket; context?: AudioContext; stream?: MediaStream; node?: AudioWorkletNode; source?: AudioNode; playback?: AudioBufferSourceNode; timer?: ReturnType<typeof setInterval>; heartbeat?: ReturnType<typeof setInterval>; stopTimeout?: ReturnType<typeof setTimeout>; flushTimeout?: ReturnType<typeof setTimeout>; finishing?: boolean; upload?: Float32Array; sentSamples?: number; decodedSamples?: number; creditSamples?: number };
 const endpoint = process.env.NEXT_PUBLIC_RECITER_WS || "ws://127.0.0.1:8000/ws/recite";
 
 export function useRecitation(surah: Surah | null, startAyah = 1) {
@@ -52,8 +52,9 @@ export function useRecitation(surah: Surah | null, startAyah = 1) {
     if (r.socket?.readyState !== WebSocket.OPEN) { generation.current++; release(); setState("idle"); return; }
     setState("stopping");
     // Flush the final partial PCM frame before requesting the last decode.
-    r.node?.port.postMessage({ type: "flush" });
-    r.flushTimeout = setTimeout(() => {
+    if (r.node) r.node.port.postMessage({ type: "flush" });
+    else r.socket.send(JSON.stringify({ type: "stop" }));
+    if (r.node) r.flushTimeout = setTimeout(() => {
       if (resources.current === r && r.socket?.readyState === WebSocket.OPEN) r.socket.send(JSON.stringify({ type: "stop" }));
     }, 250);
     r.stopTimeout = setTimeout(() => { release(); setState("idle"); setError("Final decoding timed out. Your existing results are preserved. Choose a starting ayah to resume."); }, 45000);
@@ -86,23 +87,33 @@ export function useRecitation(surah: Surah | null, startAyah = 1) {
         if (recording.duration > 600) throw new Error("Please choose a recording no longer than 10 minutes.");
         if (!recording.length) throw new Error("This recording contains no audio.");
       }
-      await context.audioWorklet.addModule("/audio/pcm-worklet.js");
-      if (generation.current !== token) return;
-      const node = new AudioWorkletNode(context, "pcm-recorder");
-      resources.current.node = node;
-      const source = recording ? context.createBufferSource() : context.createMediaStreamSource(stream!);
-      if (source instanceof AudioBufferSourceNode) {
-        source.buffer = recording!;
-        source.onended = () => { if (generation.current === token) finish(); };
-        resources.current.playback = source;
+      let node: AudioWorkletNode | undefined, source: AudioNode | undefined;
+      if (recording) {
+        // Offline resampling: uploads are not replayed at wall-clock speed and
+        // never routed to speakers or a fake microphone. Preserve the full file.
+        const offline = new OfflineAudioContext(1, Math.ceil(recording.duration * 16000), 16000);
+        const input = offline.createBufferSource(); input.buffer = recording;
+        input.connect(offline.destination); input.start();
+        const rendered = await offline.startRendering();
+        if (generation.current !== token) return;
+        const pcm = rendered.getChannelData(0).slice();
+        for (let i = 0; i < pcm.length; i++) pcm[i] = Math.max(-1, Math.min(1, pcm[i]));
+        resources.current.upload = pcm;
+        resources.current.sentSamples = resources.current.decodedSamples = 0;
+      } else {
+        await context.audioWorklet.addModule("/audio/pcm-worklet.js");
+        if (generation.current !== token) return;
+        node = new AudioWorkletNode(context, "pcm-recorder");
+        resources.current.node = node;
+        source = context.createMediaStreamSource(stream!);
+        resources.current.source = source;
       }
-      resources.current.source = source;
       const socket = new WebSocket(endpoint);
       resources.current.socket = socket;
       let ready = false;
       const timeout = setTimeout(() => { if (!ready && generation.current === token) { setError("The model service did not respond. Start the Python backend and try again."); release(); setState("idle"); } }, 15000);
       resources.current.stopTimeout = timeout;
-      socket.onopen = () => socket.send(JSON.stringify({ surah: surah.id, start_ayah: startAyah }));
+      socket.onopen = () => socket.send(JSON.stringify({ surah: surah.id, start_ayah: startAyah, input_mode: file ? "file" : "microphone" }));
       socket.onmessage = event => {
         if (generation.current !== token) return;
         let message;
@@ -111,10 +122,29 @@ export function useRecitation(surah: Surah | null, startAyah = 1) {
           ready = true; clearTimeout(timeout);
           if (resources.current.finishing) return;
           setDevice(message.device); setState("listening");
-          source.connect(node); node.connect(context.destination);
-          void context.resume();
-          if (source instanceof AudioBufferSourceNode) source.start();
-          resources.current.timer = setInterval(() => setSeconds(value => value + 1), 1000);
+          if (source && node) {
+            source.connect(node); node.connect(context.destination);
+            void context.resume();
+            resources.current.timer = setInterval(() => setSeconds(value => value + 1), 1000);
+          }
+          if (resources.current.upload) {
+            const r = resources.current;
+            if (!message.upload_credit_seconds) { setError("Restart the backend to enable paced upload processing."); release(); setState("idle"); return; }
+            r.creditSamples = message.upload_credit_seconds * 16000;
+            void (async () => {
+              while (generation.current === token && resources.current === r && !r.finishing && socket.readyState === WebSocket.OPEN) {
+                const start = r.sentSamples || 0;
+                if (start >= r.upload!.length) { finish(); break; }
+                const end = Math.min(start + 4096, r.upload!.length);
+                if (socket.bufferedAmount <= 128000 && end - (r.decodedSamples || 0) <= (r.creditSamples || 0)) {
+                  socket.send(r.upload!.slice(start, end).buffer);
+                  r.sentSamples = end;
+                  setSeconds(Math.floor(end / 16000));
+                }
+                await new Promise(resolve => setTimeout(resolve, 10));
+              }
+            })();
+          }
           let lastResponse = Date.now();
           const original = socket.onmessage;
           socket.onmessage = event => { lastResponse = Date.now(); original?.call(socket, event); };
@@ -130,12 +160,13 @@ export function useRecitation(surah: Surah | null, startAyah = 1) {
           const lag = message.audio_seconds - message.decoded_seconds;
           setConnection(lag > 8 && message.busy ? `Model catching up · ${Math.round(lag)}s pending` : message.busy ? "Decoding on device" : "Connected · waiting for speech");
         } else if (message.type === "update" || message.type === "finished") {
-          setConnection(`Last decode ${message.latency_ms || 0}ms`);
+          if (message.decoded_seconds !== undefined) resources.current.decodedSamples = Math.round(message.decoded_seconds * 16000);
+          setConnection(message.tracking_uncertain || message.asr_scorable === false ? "Recognition uncertain · no new mistake verdict" : `${message.latency_ms || 0}ms decode · ${Math.round(message.pending_seconds || 0)}s pending`);
           setUpdate(message);
           if (message.complete || message.type === "finished") { release(); setLevel(0); setState(message.complete ? "complete" : "idle"); }
         } else if (message.type === "error") { setError(message.message); release(); setState("idle"); }
       };
-      node.port.onmessage = event => {
+      if (node) node.port.onmessage = event => {
         if (generation.current !== token) return;
         if (event.data?.type === "flushed") {
           clearTimeout(resources.current.flushTimeout);

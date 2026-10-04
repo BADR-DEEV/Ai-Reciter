@@ -77,7 +77,7 @@ def assess_sound(candidates, target, logprobs, transcript):
 
 
 def assess_reading(target_text, transcript):
-    """Ordered fuzzy word agreement between the expected text and a blind transcript."""
+    """Exact ordered word agreement; not certified learner pronunciation."""
     expected, heard = words(target_text), words(transcript)
     matched = {i: j for i, j in alignment(expected, heard)}
     statuses = [{"index": i, "text": w, "status": "correct" if i in matched else "missed",

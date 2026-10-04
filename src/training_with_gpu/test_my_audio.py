@@ -1,15 +1,19 @@
-"""Test personal recitation on Full Model or LoRA adapter."""
+"""Blind personal-audio ASR diagnostics, NOT pronunciation/omission certification."""
 
 import argparse
-from difflib import SequenceMatcher
 from pathlib import Path
-import re
 import numpy as np
 import soundfile as sf
 import torch
 import torchaudio.functional as F
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 from peft import PeftModel
+import json
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.dataset_collection.qaloon_audio2text import normalize_quran_for_asr
+from src.training_with_gpu.decoding_safety import generation_diagnostics, load_private_adapter
+from src.training_with_gpu.train_base_full import configure_generation, MODEL_REVISIONS
 
 
 def parse_args():
@@ -19,20 +23,19 @@ def parse_args():
                    help="Path to trained model (Full model or LoRA dir)")
     p.add_argument("--base-model", type=str, default="openai/whisper-base")
     p.add_argument("--expected-text", type=str, default=None, help="The correct Quranic ayah text")
-    p.add_argument("--prompt", type=str, default="بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ")
-    p.add_argument("--beams", type=int, default=5, help="Beam search size (default: 5)")
+    p.add_argument("--prompt", type=str, default=None, help="Deprecated: prompts are rejected for unbiased learner assessment")
+    p.add_argument("--beams", type=int, default=3, help="Beam search size (default: 3)")
     p.add_argument("--compare-zero-shot", action="store_true", help="Compare with vanilla Whisper-base")
-    return p.parse_args()
+    args = p.parse_args()
+    if args.prompt:
+        p.error("Expected/preamble prompts are not permitted in blind learner assessment")
+    if args.beams < 1:
+        p.error("Require positive beam count")
+    return args
 
 
 def normalize_quran_text(text: str) -> str:
-    text = re.sub(r"[\u064B-\u0652\u0670]", "", text)
-    text = re.sub(r"[\u06D6-\u06ED\u06E9۩ۚۖۗۘۙ]", "", text)
-    text = re.sub(r"[إأآٱ]", "ا", text)
-    text = re.sub(r"ئ", "ي", text)
-    text = re.sub(r"ؤ", "و", text)
-    text = re.sub(r"[^\w\s]", "", text)
-    return " ".join(text.split())
+    return normalize_quran_for_asr(text)
 
 
 def load_and_preprocess_audio(audio_path: Path):
@@ -44,66 +47,47 @@ def load_and_preprocess_audio(audio_path: Path):
         audio_tensor = F.resample(audio_tensor, sample_rate, 16000)
         audio = audio_tensor.numpy()
     duration = len(audio) / 16000
+    if not len(audio) or not np.isfinite(audio).all():
+        raise ValueError("Audio must be nonempty and finite")
     if duration > 30.0:
-        audio = audio[: 16000 * 30]
+        raise ValueError("Audio exceeds 30 seconds; use windowed studio decoding. Never silently truncate a complete recitation.")
     return audio
 
 
-def transcribe(model, processor, audio, device, prompt_text=None, num_beams=5):
-    inputs = processor(audio, sampling_rate=16000, return_tensors="pt")
+def transcribe(model, processor, audio, device, prompt_text=None, num_beams=3, return_diagnostics=False):
+    if prompt_text:
+        raise ValueError("No expected-text prompts in blind assessment")
+    inputs = processor(audio, sampling_rate=16000, return_attention_mask=True, return_tensors="pt")
     input_features = inputs.input_features.to(device)
 
     gen_kwargs = {
         "language": "arabic",
         "task": "transcribe",
         "num_beams": num_beams,
+        "max_length": model.config.max_target_positions,
+        "use_cache": True,
+        "return_dict_in_generate": True,
+        "attention_mask": inputs.attention_mask.to(device),
     }
-    if prompt_text:
-        prompt_ids = processor.get_prompt_ids(prompt_text, return_tensors="pt").to(device)
-        gen_kwargs["prompt_ids"] = prompt_ids
 
     with torch.no_grad():
-        predicted_ids = model.generate(input_features, **gen_kwargs)
-    return processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
-
-
-def fuzzy_similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a, b).ratio()
+        predicted_ids = model.generate(input_features, **gen_kwargs).sequences
+    text = processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
+    diagnostics = generation_diagnostics(predicted_ids[0].tolist(), processor.tokenizer, model.config.max_target_positions)
+    return (text, diagnostics) if return_diagnostics else text
 
 
 def analyze_omissions(expected: str, predicted: str):
-    norm_exp = normalize_quran_text(expected).split()
-    norm_pred = normalize_quran_text(predicted).split()
-    
-    true_omissions = []
-    pronunciation_slips = []
-    correct_matches = []
-    
-    for exp_w in norm_exp:
-        best_match = None
-        best_score = 0.0
-        for pred_w in norm_pred:
-            sim = fuzzy_similarity(exp_w, pred_w)
-            if pred_w.endswith("ه") and fuzzy_similarity(exp_w, pred_w[:-1]) > sim:
-                sim = fuzzy_similarity(exp_w, pred_w[:-1])
-            if sim > best_score:
-                best_score = sim
-                best_match = pred_w
-        
-        if best_score >= 0.80:
-            correct_matches.append(exp_w)
-        elif best_score >= 0.45:
-            pronunciation_slips.append(f"{exp_w} ──► heard: '{best_match}' (match: {int(best_score*100)}%)")
-        else:
-            true_omissions.append(exp_w)
-
-    accuracy = (len(correct_matches) / max(1, len(norm_exp))) * 100
-    return {
-        "accuracy": accuracy,
-        "correct": correct_matches,
-        "slips": pronunciation_slips,
-        "true_omissions": true_omissions,
-    }
+    # Historical function name retained; output is sequence-aware ASR diagnostics.
+    import jiwer
+    reference, hypothesis = normalize_quran_text(expected), normalize_quran_text(predicted)
+    if not reference:
+        raise ValueError("Expected comparison text must be nonempty")
+    alignment = jiwer.process_words(reference, hypothesis)
+    return {"wer": alignment.wer, "exact_normalized_text_match": reference == hypothesis,
+        "apparent_deletions": alignment.deletions, "substitutions": alignment.substitutions,
+        "insertions": alignment.insertions,
+        "warning": "Text recognition differences do not certify learner omissions, pronunciation or tajweed."}
 
 
 def main():
@@ -114,41 +98,57 @@ def main():
     # Optional Zero-Shot check
     if args.compare_zero_shot:
         print("Transcribing with Vanilla Whisper-Base (Zero-Shot)...")
-        zero_processor = WhisperProcessor.from_pretrained(args.base_model)
-        zero_model = WhisperForConditionalGeneration.from_pretrained(args.base_model).to(device)
+        revision = MODEL_REVISIONS.get(args.base_model)
+        zero_processor = WhisperProcessor.from_pretrained(args.base_model, revision=revision)
+        zero_model = WhisperForConditionalGeneration.from_pretrained(args.base_model, revision=revision).to(device)
+        zero_processor.tokenizer.set_prefix_tokens(language="arabic", task="transcribe")
+        configure_generation(zero_model, zero_processor)
+        zero_model.eval()
         zero_shot_result = transcribe(zero_model, zero_processor, audio, device, num_beams=1)
         print(f"\n[Vanilla Base]: {zero_shot_result}\n")
+        del zero_model
+        torch.cuda.empty_cache()
 
     # Load Full Model or LoRA
     adapter_config = args.model_path / "adapter_config.json"
     if adapter_config.exists():
         print(f"Loading base model + LoRA adapter from: {args.model_path} ...")
-        processor = WhisperProcessor.from_pretrained(args.base_model)
-        base = WhisperForConditionalGeneration.from_pretrained(args.base_model).to(device)
-        model = PeftModel.from_pretrained(base, str(args.model_path)).to(device)
+        adapter = json.loads(adapter_config.read_text(encoding="utf-8"))
+        if adapter.get("base_model_name_or_path") == "tarteel-ai/whisper-base-ar-quran":
+            model, processor = load_private_adapter(args.model_path, device)
+        else:
+            base_id = adapter.get("base_model_name_or_path", args.base_model)
+            revision = adapter.get("revision") or MODEL_REVISIONS.get(base_id)
+            processor = WhisperProcessor.from_pretrained(args.model_path)
+            base = WhisperForConditionalGeneration.from_pretrained(base_id, revision=revision).to(device)
+            configure_generation(base, processor)
+            model = PeftModel.from_pretrained(base, str(args.model_path)).to(device)
     else:
         print(f"🔥 Loading FULL FINE-TUNED MODEL from: {args.model_path} ...")
         processor = WhisperProcessor.from_pretrained(str(args.model_path))
         model = WhisperForConditionalGeneration.from_pretrained(str(args.model_path)).to(device)
+        configure_generation(model, processor)
     
     model.eval()
-    print(f"Transcribing (Beams: {args.beams}, Prompt: '{args.prompt}')...")
-    result = transcribe(model, processor, audio, device, prompt_text=args.prompt, num_beams=args.beams)
+    processor.tokenizer.set_prefix_tokens(language="arabic", task="transcribe")
+    print(f"Blind transcription (Beams: {args.beams}; no expected-text prompt)...")
+    if np.sqrt(np.mean(audio ** 2)) < 1e-5:
+        print("ABSTAIN: near-silent recording; no recitation score.")
+        return
+    result, diagnostics = transcribe(model, processor, audio, device, num_beams=args.beams, return_diagnostics=True)
 
     print("\n" + "=" * 65)
     print(f"🎙️  Model Output:     {result}")
+    print("Decode diagnostics:", diagnostics)
+    if not diagnostics["scorable"]:
+        print("ABSTAIN: unreliable model decoding. Re-record or ask a teacher; no learner mistake is inferred.")
+        return
     
     if args.expected_text:
         print(f"📖 Expected Ayah:    {args.expected_text}")
         analysis = analyze_omissions(args.expected_text, result)
         print("-" * 65)
-        print(f"📊 Match Accuracy:   {analysis['accuracy']:.1f}%")
-        if analysis["true_omissions"]:
-            print(f"🚨 True Omissions:   {analysis['true_omissions']}")
-        else:
-            print("✅ No missing words! (All words detected)")
-        if analysis["slips"]:
-            print(f"⚠️  Pronunciation:   {analysis['slips']}")
+        print("ASR text diagnostics:", analysis)
     print("=" * 65)
 
 

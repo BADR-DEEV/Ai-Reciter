@@ -13,20 +13,38 @@ import re
 import unicodedata
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "qaloon-tajweed-candidates-0.1"
-RULES = {
-    "madd_lazim": {"en": "Necessary madd · 6 harakat", "ar": "مد لازم · ٦ حركات", "color": "#c1121f", "harakat": [6]},
-    "madd_muttasil": {"en": "Connected madd · route review", "ar": "مد متصل · راجع الطريق", "color": "#df3a32", "harakat": None},
-    "madd_munfasil": {"en": "Separate madd · Qaloon route/choice review", "ar": "مد منفصل · راجع طريق قالون والوجه", "color": "#df3a32", "harakat": None},
-    "madd_arid": {"en": "Pause-induced madd · 2 / 4 / 6 harakat", "ar": "مد عارض للسكون عند الوقف · ٢ / ٤ / ٦", "color": "#df3a32", "harakat": [2, 4, 6]},
-    "madd_tabii": {"en": "Natural madd · 2 harakat", "ar": "مد طبيعي · حركتان", "color": "#c94b41", "harakat": [2]},
-    "idgham": {"en": "Nun/tanwin idgham · joined reading", "ar": "إدغام النون أو التنوين · عند الوصل", "color": "#16743a", "harakat": None},
-    "ikhfa": {"en": "Nun/tanwin ikhfa · joined reading", "ar": "إخفاء النون أو التنوين · عند الوصل", "color": "#646b73", "harakat": None},
-    "iqlab": {"en": "Iqlab before ba · joined reading", "ar": "إقلاب قبل الباء · عند الوصل", "color": "#8a4c9c", "harakat": None},
-    "qalqala": {"en": "Qalqalah · sukun/ending pause", "ar": "قلقلة · عند السكون أو الوقف آخر الآية", "color": "#007e8c", "harakat": None},
-    "tafkhim": {"en": "Emphatic isti'la letter", "ar": "تفخيم حرف استعلاء", "color": "#164acb", "harakat": None},
-    "ghunna": {"en": "Doubled nun/mim · ghunna", "ar": "غنة النون أو الميم المشددتين", "color": "#795e17", "harakat": None},
+VERSION = "qaloon-shatibiyyah-candidates-0.3"
+LEGEND = {
+    "necessary": {"en": "Necessary madd · 6 counts", "ar": "مد لازم · ٦ حركات", "color": "#ae0088"},
+    "connected": {"en": "Ordinary connected madd · Qaloon 4", "ar": "مد متصل عادي · قالون ٤ حركات", "color": "#dd007f"},
+    "permitted": {"en": "Permitted madd · see rule/options", "ar": "مد جائز · بحسب الحكم والوجه", "color": "#d18a00"},
+    "natural": {"en": "Natural madd · 2 counts", "ar": "مد طبيعي · حركتان", "color": "#a98924"},
+    "nasal": {"en": "Ikhfa / iqlab / ghunna · 2 counts", "ar": "إخفاء وإقلاب ومواقع الغنة · حركتان", "color": "#009b64"},
+    "merged": {"en": "Merged or unpronounced letter · in wasl", "ar": "إدغام وما لا يلفظ · عند الوصل", "color": "#8c9188"},
+    "heavy": {"en": "Tafkhim · heavy articulation", "ar": "تفخيم", "color": "#007692"},
+    "echo": {"en": "Qalqalah · echo on a sakin letter", "ar": "قلقلة", "color": "#00a6bd"},
 }
+RULES = {
+    "madd_lazim": {"en": "Necessary madd · 6 harakat", "ar": "مد لازم · ٦ حركات", "group": "necessary", "harakat": [6]},
+    "madd_muttasil": {"en": "Ordinary connected madd · Qaloon/Shatibiyyah 4 harakat", "ar": "مد متصل عادي · قالون من الشاطبية ٤ حركات", "group": "connected", "harakat": [4]},
+    "madd_changed_hamza": {"en": "Madd before changed adjacent hamza · combination review", "ar": "مد قبل همزة متغيرة · مراجعة الأوجه والتركيب", "group": "permitted", "harakat": None},
+    "madd_munfasil": {"en": "Separate madd · Qaloon/Shatibiyyah 2 or 4 harakat", "ar": "مد منفصل · قالون من الشاطبية ٢ أو ٤ حركات", "group": "permitted", "harakat": [2, 4]},
+    "madd_arid": {"en": "Pause-induced madd · 2 / 4 / 6 harakat", "ar": "مد عارض للسكون عند الوقف · ٢ / ٤ / ٦", "group": "permitted", "harakat": [2, 4, 6]},
+    "madd_tabii": {"en": "Natural madd · 2 harakat", "ar": "مد طبيعي · حركتان", "group": "natural", "harakat": [2]},
+    "madd_iwad": {"en": "Fathatayn replacement on stopping · 2 harakat (not ta marbuta)", "ar": "مد عوض عند الوقف على تنوين الفتح · حركتان، دون التاء المربوطة", "group": "natural", "harakat": [2]},
+    "madd_lin": {"en": "Lin before final pause-induced sukun · 2 / 4 / 6 harakat", "ar": "مد لين قبل السكون العارض عند الوقف · ٢ / ٤ / ٦ حركات", "group": "permitted", "harakat": [2, 4, 6]},
+    "idgham": {"en": "Nun/tanwin merged · wasl; ghunna only with its nasal letters", "ar": "إدغام النون أو التنوين · عند الوصل؛ الغنة مع حروفها", "group": "merged", "harakat": None},
+    "silent": {"en": "Unpronounced source-marked letter · wasl context", "ar": "حرف لا يلفظ بحسب علامة المصدر · في سياق الوصل", "group": "merged", "harakat": None},
+    "ikhfa": {"en": "Nun/tanwin ikhfa · ghunna 2 harakat in wasl", "ar": "إخفاء النون أو التنوين · غنة حركتين عند الوصل", "group": "nasal", "harakat": [2]},
+    "iqlab": {"en": "Iqlab before ba · ghunna 2 harakat in wasl", "ar": "إقلاب قبل الباء · غنة حركتين عند الوصل", "group": "nasal", "harakat": [2]},
+    "ikhfa_shafawi": {"en": "Sakin mim before ba · ghunna 2; conditional on mim sukun, not silah", "ar": "إخفاء شفوي للميم الساكنة قبل الباء · غنة حركتين؛ مع وجه السكون لا الصلة", "group": "nasal", "harakat": [2]},
+    "idgham_shafawi": {"en": "Sakin mim into mim · ghunna 2; conditional on mim sukun, not silah", "ar": "إدغام شفوي للميم الساكنة في الميم · غنة حركتين؛ مع وجه السكون لا الصلة", "group": "nasal", "harakat": [2]},
+    "qalqala": {"en": "Qalqalah · sukun/ending pause", "ar": "قلقلة · عند السكون أو الوقف آخر الآية", "group": "echo", "harakat": None},
+    "tafkhim": {"en": "Tafkhim · supported letter/context", "ar": "تفخيم · للحرف والسياق المدعوم", "group": "heavy", "harakat": None},
+    "ghunna": {"en": "Ghunna · 2 harakat", "ar": "غنة · حركتان", "group": "nasal", "harakat": [2]},
+}
+for rule in RULES.values():
+    rule["color"] = LEGEND[rule["group"]]["color"]
 PRIORITY = {rule: index for index, rule in enumerate(RULES)}
 
 
@@ -46,12 +64,15 @@ def glyphs(text):
     return result
 
 
-def annotate(text, disjoint=False):
+def annotate(text, disjoint=False, source_text=None):
     letters = glyphs(text)
+    source_letters = glyphs(source_text or text)
+    same_letters = len(source_letters) == len(letters) and all(a["base"].replace("ٱ", "ا") == b["base"].replace("ٱ", "ا") for a, b in zip(source_letters, letters))
     spans = []
     warnings = ["Machine candidates; qualified Qaloon review required.",
                 "Context: joined words within this ayah, stop at ayah end; internal waqf/next-ayah wasl are not modeled.",
-                "Qaloon tariq not selected: mim al-jam, pronoun silah, hamza variants and disjoint-letter madd are not resolved."]
+                "Shatibiyyah madd options are listed, not an arbitrary Hafs color-key length. Consistent performance choices still require review.",
+                "Mim al-jam, pronoun silah, hamza variants and disjoint-letter madd require specialized review; unresolved cases are not assigned a fixed color/count."]
     tanwin = "ًٌٍٖٗٞ"
     def add(index, rule, note=""):
         letter = letters[index]
@@ -67,13 +88,45 @@ def annotate(text, disjoint=False):
         base, marks = letter["base"], letter["marks"]
         nxt = letters[i + 1] if i + 1 < len(letters) else None
         prev = letters[i - 1] if i else None
+        raw_marks = source_letters[i]["marks"] if same_letters else marks
         at_end = i == len(letters) - 1
+        if "۟" in raw_marks or (prev and prev["word"] != letter["word"] and (base == "ٱ" or "۬" in raw_marks)):
+            add(i, "silent", "Source silent/wasl notation; wasl marking applies only when joining the preceding word.")
+        if base == "ل" and prev and prev["base"] in "اٱ" and nxt and nxt["base"] in "تثدذرزسشصضطظلن" and "ّ" in nxt["marks"]:
+            add(i, "silent", "Lam of the sun-letter article is assimilated, not pronounced separately.")
         if base in "خصضغطقظ":
-            add(i, "tafkhim", "Only inherently emphatic letters; ra/lam/alif contextual heaviness is not inferred.")
-        if base in "قطبجد" and ("ْ" in marks or at_end):
+            add(i, "tafkhim", "Inherently emphatic isti'la letter; precise heaviness strength still depends on vowel/context.")
+        if base == "ر" and not at_end:
+            if any(v in marks for v in "ًٌَُ") or ("ْ" in marks and prev and any(v in prev["marks"] for v in "َُ") and prev["base"] not in "اٱ"):
+                add(i, "tafkhim", "Non-final ra with fatha/damma, or sakin ra after an explicit preceding fatha/damma; other ra/waqf exceptions need review.")
+        if base == "ل" and "ّ" in marks:
+            word_letters = [x for x in letters if x["word"] == letter["word"]]
+            word_base = "".join(x["base"] for x in word_letters).replace("ٱ", "ا")
+            if word_base == "الله":
+                preceding = next((x for x in reversed(letters[:i]) if x["word"] != letter["word"]), None)
+                if preceding is None or any(v in preceding["marks"] for v in "َُ"):
+                    add(i, "tafkhim", "Lam of Allah is heavy initially or after an explicit fatha/damma; not after kasra.")
+        if base in "قطبجد" and ("ْ" in marks or (at_end and not any(v in marks for v in "ًٗ"))):
             add(i, "qalqala", "At ayah end this applies only when actually stopping; no fixed added vowel.")
         if base in "نم" and "ّ" in marks:
             add(i, "ghunna")
+        if base == "م" and "ْ" in marks and nxt and nxt["word"] != letter["word"]:
+            if nxt["base"] == "ب":
+                add(i, "ikhfa_shafawi", "Applies when this mim is actually read sakin. Qaloon mim al-jam silah is a separate unselected performance choice, not inferred from this color.")
+            elif nxt["base"] == "م":
+                add(i, "idgham_shafawi", "Applies to the sukun realization; mim al-jam silah must be reviewed separately.")
+                add(i + 1, "ghunna", "Recipient of mim-sakin assimilation, conditional on sukun realization.")
+        if (base in "وي" and "ْ" in marks and prev and "َ" in prev["marks"]
+                and prev["word"] == letter["word"] and nxt and i + 1 == len(letters) - 1
+                and nxt["word"] == letter["word"] and nxt["base"] not in "ةاىويے"
+                and not any(v in nxt["marks"] for v in "ًٗ")):
+            add(i, "madd_lin", "Only on stopping here; in wasl this is a lin sound, not natural madd.")
+        # The Maghrebi source can attach fathatayn to the spelling ALIF,
+        # whereas other fonts place it on the preceding consonant. Read both
+        # layouts without changing the source text or display offsets.
+        if at_end and base in "اى" and prev and any(v in prev["marks"] + marks for v in "ًٗ"):
+            add(i, "madd_iwad", "Replace final fathatayn by a long a on stopping, not sukun on its consonant.")
+            continue
         if nxt:
             is_nun = base == "ن" and ("ْ" in marks or not any(v in marks for v in "َُِّ"))
             is_tanwin = any(v in marks for v in tanwin)
@@ -85,6 +138,8 @@ def annotate(text, disjoint=False):
                 other_word = following["word"] != letter["word"]
                 if following["base"] in "يرملون" and other_word:
                     add(i, "idgham", "Nun-sakin idgham is across words, not dunya/bunyan/qinwan/sinwan within a word.")
+                    if following["base"] in "ينمو":
+                        add(letters.index(following), "ghunna", "Nasal recipient of nun/tanwin idgham; no ghunna for lam/ra.")
                 elif following["base"] in "تثجدذزسشصضطظفقك":
                     add(i, "ikhfa")
                 elif following["base"] == "ب":
@@ -96,16 +151,21 @@ def annotate(text, disjoint=False):
             or base == "و" and "ُ" in prev["marks"] and not any(v in marks for v in "َُِّ")
             or base == "ى" and "َ" in prev["marks"]))
         if long_vowel:
-            if "۟" in marks:
+            if "۟" in raw_marks:
                 warnings.append("Zero/silent-letter notation encountered; long-vowel candidate withheld.")
                 continue
             if nxt and nxt["word"] == letter["word"] and ("ّ" in nxt["marks"] or "ْ" in nxt["marks"]):
                 add(i, "madd_lazim", "Permanent sukun/shadda candidate; spelling exceptions still require review.")
             elif nxt and nxt["base"] in "ءأإؤئآ" and nxt["word"] == letter["word"]:
-                add(i, "madd_muttasil", "Common Qaloon/Shatibiyyah tawassut is 4 harakat; exact tariq must be confirmed before fixing a count.")
+                next_next = letters[i + 2] if i + 2 < len(letters) else None
+                if next_next and next_next["word"] != nxt["word"] and next_next["base"] in "ءأإؤئآ":
+                    add(i, "madd_changed_hamza", "Adjacent hamzas across words can change the madd cause in Qaloon; tas-hil/omission and permissible combinations need lexical/route review.")
+                else:
+                    add(i, "madd_muttasil", "Ordinary unchanged hamzat-qat in the same word: Qaloon from Shatibiyyah reads 4 harakat.")
             elif nxt and nxt["base"] in "ءأإآ" and nxt["word"] != letter["word"]:
                 add(i, "madd_munfasil", "Qaloon qasr/tawassut choices must be selected consistently; not a universal 4.")
-            elif nxt and i + 1 == len(letters) - 1 and "ّ" not in nxt["marks"] and "ْ" not in nxt["marks"]:
+            elif (nxt and i + 1 == len(letters) - 1 and "ْ" not in nxt["marks"]
+                  and nxt["base"] not in "ةاىويے" and not any(v in nxt["marks"] for v in "ًٗ")):
                 add(i, "madd_arid", "Length options arise on stopping, not on connected reading.")
             else:
                 add(i, "madd_tabii")
@@ -130,17 +190,23 @@ def build(source, output):
             # not silently switch it to differently marked raw-source spelling.
             text = re.sub(r"[\d\u0660-\u0669]+", "", ayah.get("displayText") or ayah["text"]).strip()
             starts_with_letters = surah["id"] in {2, 3, 7, 10, 11, 12, 13, 14, 15, 19, 20, 26, 27, 28, 29, 30, 31, 32, 36, 38, 40, 41, 42, 43, 44, 45, 46, 50, 68} and ayah["ayah"] == 1
-            data = annotate(text, disjoint=starts_with_letters or (surah["id"], ayah["ayah"]) == (42, 2))
+            data = annotate(text, disjoint=starts_with_letters or (surah["id"], ayah["ayah"]) == (42, 2), source_text=ayah["text"])
             counts.update(s["rule"] for s in data["spans"])
             data["warnings"].append("Spans address the reader displayText; original Qaloon source is retained separately. Simplified typography cannot establish every riwayah-specific rule.")
             ayahs.append({"ayah": ayah["ayah"], "source_text": ayah["text"], **data})
         surahs.append({"id": surah["id"], "ayahs": ayahs})
     if len(surahs) != 114:
         raise ValueError("Cache all 114 Qaloon surahs before generating the whole-Quran JSON")
-    payload = {"schema_version": 1, "version": VERSION, "riwayah": "Qaloon an Nafi", "tariq": "unselected-needs-qualified-review",
+    basmalah = "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ"
+    payload = {"schema_version": 2, "version": VERSION, "riwayah": "Qaloon an Nafi", "tariq": "Shatibiyyah-options-performance-choice-unselected",
                "status": "machine-candidates-not-certified-mushaf", "approved_ayahs": 0,
                "duration_unit": "harakat-not-seconds", "offset_unit": "utf16", "source_sha256": digest.hexdigest(),
-               "context": "wasl-within-ayah-waqf-at-end", "rules": RULES, "counts": dict(counts), "surahs": surahs}
+               "context": "wasl-within-ayah-waqf-at-end", "rules": RULES, "legend": LEGEND,
+               "basmalah": {"ayah": 0, **annotate(basmalah, source_text="بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ")},
+               "sources": [{"url": "https://www.scribd.com/document/652847888/Qaloon-Tajweed-Rules", "access": "client-challenge-not-read"},
+                           {"url": "https://archive.org/details/UsulRewayatQalun", "title": "The Secure Way to Rewayat Qalun", "pages": "8–14, 18–22", "access": "public-secondary-reference-read"},
+                           {"source": "user-supplied mushaf image", "use": "palette/categories only; printed lengths are not copied as Qaloon rulings"}],
+               "counts": dict(counts), "surahs": surahs}
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(".tmp")
     temporary.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")

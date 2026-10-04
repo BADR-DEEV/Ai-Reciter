@@ -1,3 +1,4 @@
 # Optional review-only large ASR pipeline; never replace your CUDA torch wheel.
 faster-whisper>=1.2.1,<2
 soundfile>=0.12
+scipy>=1.11,<2

@@ -1,4 +1,4 @@
-"""Score untouched or LoRA Whisper on identical held-out Qaloon ayahs."""
+"""Frozen blind/assisted private benchmark CLI; historical helper retained."""
 
 import argparse
 import json
@@ -10,7 +10,8 @@ from qaloon_data import DATA_ROOT, RECITER_DIRS, load_splits
 from gpu_evaluation import evaluate_rows
 
 
-def main():
+def legacy_main():
+    """Historical evaluator retained for inspection, not the active CLI."""
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", choices=["tiny", "base"], default="base")
     p.add_argument("--adapter", type=Path, help="LoRA directory; omit for a zero-shot baseline")
@@ -48,6 +49,13 @@ def main():
         for detail in details:
             handle.write(json.dumps(detail, ensure_ascii=False) + "\n")
     print(json.dumps(report, ensure_ascii=False, indent=2))
+
+
+def main():
+    """Evaluate frozen manifests and the actual pinned adapter/base, not OpenAI."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from src.training_with_gpu.benchmark_reciter import main as benchmark
+    benchmark()
 
 
 if __name__ == "__main__":

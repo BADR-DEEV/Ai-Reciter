@@ -49,7 +49,11 @@ export async function signIn(name: string, password: string) {
 export function deleteActive() {
   const profile = activeProfile();
   if (!profile) return;
-  localStorage.removeItem(progressKey());
+  const key = progressKey();
+  // Remove only this profile's optional learner histories, not guest/other profiles.
+  for (const stored of Object.keys(localStorage)) {
+    if (stored === key || stored.startsWith(`${key}:adaptive-v1:`)) localStorage.removeItem(stored);
+  }
   localStorage.setItem(KEY, JSON.stringify(profiles().filter(p => p.id !== profile.id)));
   setActive(null);
 }

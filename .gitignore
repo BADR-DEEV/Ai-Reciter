@@ -53,6 +53,7 @@ checkpoints/
 *.engine
 
 # CTranslate2 / faster-whisper exported models
+models/segmentation/
 deployable_*/
 *_ct2/
 

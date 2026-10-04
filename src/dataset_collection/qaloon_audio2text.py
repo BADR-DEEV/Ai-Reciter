@@ -141,7 +141,7 @@ def normalize_asr(text):
     )
 
 
-def normalize_quran_for_asr(text: str) -> str:
+def normalize_quran_for_asr_v1(text: str) -> str:
     """Normalize Qālūn Uthmani spelling for unvowelled, MSA-style ASR labels.
 
     Resolve dagger-alif seats before removing the dagger; preserve medial
@@ -180,6 +180,43 @@ def normalize_quran_for_asr(text: str) -> str:
     text = re.sub(r"[إأآٱ]", "ا", text)
     text = re.sub(r"[^\u0621-\u063A\u0641-\u064A\s]", " ", text)
     return re.sub(r"\s+", " ", text).strip()
+
+
+NORMALIZER_VERSION = "qaloon-asr-v2-vocative-consonantal-yaa"
+
+
+def normalize_quran_for_asr(text: str) -> str:
+    """V2: distinguish consonantal yaa from a silent dagger-alif seat.
+
+    Resolve while fatha is still visible: قِيَٰمَة -> قيامة, but أَتَيٰكَ -> أتاك.
+    Initial Uthmani vocatives are separate words even when graphically joined.
+    Final alif/maqsura and medial hamza are NOT folded into fuzzy equivalence.
+    V1 stays callable solely to audit frozen historical labels/results.
+    """
+    text = str(text)
+    marks = r"[\u064B-\u065F]*"
+    # A token-initial (optionally conjoined) vocalized vocative, not an arbitrary
+    # medial yaa. Insert a real word boundary instead of deleting the vocative.
+    text = re.sub(r"(?<![\u0621-\u0671\u06D6-\u06EF])([وف]" + marks + r")?يَ\u0670" + marks,
+                  lambda m: (m.group(1) or "") + "يا ", text)
+    # Yaa carrying fatha is pronounced; replacing it with alif destroys قیامة,
+    # آيات, ديار and similar words. Consume the dagger before v1 seat resolution.
+    text = re.sub(r"ي([\u064B-\u065F]*َ[\u064B-\u065F]*)\u0670", lambda m: "ي" + m.group(1) + "ا", text)
+    # Uthmani initial standalone hamza+alif is equivalent to normalized آ, NOT
+    # a rule deleting arbitrary medial/final hamza or final alif.
+    text = re.sub(r"(?<![\u0621-\u064A\u064B-\u065F])ء" + marks + r"ا", "ا", text)
+    normalized = normalize_quran_for_asr_v1(text)
+    # Includes an initial hamza bearing a dagger itself (ءَٰا...) and is
+    # idempotent. Preserve the resulting two alifs for interrogative أأ forms.
+    return re.sub(r"(?<![\u0621-\u064A])ء(?=ا)", "", normalized)
+
+
+def normalizer_for_version(version):
+    if version in (None, "qaloon-asr-v1"):
+        return normalize_quran_for_asr_v1
+    if version == NORMALIZER_VERSION:
+        return normalize_quran_for_asr
+    raise ValueError(f"Unknown frozen normalizer version: {version}")
 
 
 # Backward-compatible name used by existing dataset builders.
@@ -292,7 +329,10 @@ def load_quran():
 
         db[(s, a)] = {
             "text": clean,
-            "text_asr": normalize_asr(clean),
+            # Derive recognition labels from intact Uthmani evidence, NOT the
+            # legacy simplified display text, which already discarded vowels.
+            "text_asr": normalize_quran_for_asr(row["aya_text"]),
+            "normalizer_version": NORMALIZER_VERSION,
             "raw": row["aya_text"],
         }
 
@@ -329,7 +369,8 @@ def aligned_text(db, surah, audio_ayah):
 
             return {
                 "text": text,
-                "text_asr": normalize_asr(text),
+                "text_asr": normalize_quran_for_asr(f"{x['raw']} {y['raw']}"),
+                "normalizer_version": NORMALIZER_VERSION,
                 "raw": f"{x['raw']} {y['raw']}",
             }
 
@@ -423,7 +464,8 @@ def apply_ayah_merges(db):
 
                 fixed[(surah, new_ayah)] = {
                     "text": text,
-                    "text_asr": normalize_asr(text),
+                    "text_asr": normalize_quran_for_asr(raw),
+                    "normalizer_version": NORMALIZER_VERSION,
                     "raw": raw,
                     "source_ayahs": source_ayahs,
                 }
@@ -484,6 +526,7 @@ def main():
             "relative_audio_path": f"audio/{filename}",
             "text": data["text"],
             "text_asr_normalized": data["text_asr"],
+            "normalizer_version": NORMALIZER_VERSION,
             "normalized_with_harakat": normalize_with_harakat(data["raw"]),
             "text_raw_uthmani": data["raw"],
             "reciter": reciter,

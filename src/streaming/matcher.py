@@ -3,7 +3,6 @@
 This is transcript agreement, not acoustic correctness or a tajweed judgment.
 The expected text is never supplied as a Whisper decoder prompt.
 """
-from difflib import SequenceMatcher
 from functools import lru_cache
 from pathlib import Path
 import sys
@@ -22,17 +21,21 @@ def words(text):
 
 
 def alignment(expected, heard):
-    """LCS with fuzzy substitutions, preserving word order and multiplicity."""
+    """Exact normalized LCS, preserving word order and multiplicity.
+
+    Fuzzy spelling matches can mark Hafs مالك as Qaloon ملك or hide a real
+    substitution. Navigation uses acoustic-ASR agreement, never forced completion.
+    """
     n, m = len(expected), len(heard)
     dp = [[0] * (m + 1) for _ in range(n + 1)]
     for i in range(n - 1, -1, -1):
         for j in range(m - 1, -1, -1):
-            similar = SequenceMatcher(None, expected[i], heard[j]).ratio() >= 0.8
+            similar = expected[i] == heard[j]
             dp[i][j] = max(dp[i + 1][j], dp[i][j + 1], dp[i + 1][j + 1] + int(similar))
     pairs = []
     i, j = 0, 0
     while i < n and j < m:
-        similar = SequenceMatcher(None, expected[i], heard[j]).ratio() >= 0.8
+        similar = expected[i] == heard[j]
         if similar and dp[i][j] == dp[i + 1][j + 1] + 1:
             pairs.append((i, j))
             i, j = i + 1, j + 1
@@ -44,8 +47,11 @@ def alignment(expected, heard):
 
 
 class RecitationTracker:
-    def __init__(self, ayahs, threshold=0.65, surah=None):
-        self.ayahs = ayahs
+    def __init__(self, ayahs, threshold=0.65, surah=None, context_limit=80):
+        # Cached normalized fields may predate the v2 bug fix. Derive matching
+        # text from intact source text when available, without altering artwork.
+        self.ayahs = [{**row, "normalized": normalize_quran_for_asr(row["text"]) if row.get("text") else row["normalized"]}
+                      for row in ayahs]
         self.threshold = threshold
         self.index = 0
         self.results = {}
@@ -57,6 +63,8 @@ class RecitationTracker:
         self.completed_context = []
         self.tentative_prefix = False
         self.has_advanced = False
+        self.context_limit = context_limit
+        self.uncertain_audio = False
 
     @property
     def done(self):
@@ -92,14 +100,14 @@ class RecitationTracker:
             if i in matched:
                 status = "correct"
                 self.omission_observations.pop(key, None)
-            elif completed:
+            elif completed and not self.uncertain_audio:
                 status = "missed"
             elif i < frontier and len(pairs) >= 2:
                 # A decoder can revise partial text. Confirm skipped positions
                 # twice (or at a voiced boundary), never color future words red.
                 count = self.omission_observations.get(key, 0) + 1
                 self.omission_observations[key] = count
-                if boundary or count >= 2:
+                if not self.uncertain_audio and (boundary or count >= 2):
                     status = "missed"
             else:
                 self.omission_observations.pop(key, None)
@@ -112,7 +120,7 @@ class RecitationTracker:
     def clear_context(self):
         self.completed_context = []
 
-    def feed(self, transcript, final=False, continuous=False):
+    def feed(self, transcript, final=False, continuous=False, stable_prefix=0):
         self.tentative_prefix = False
         if self.done:
             return self.snapshot(transcript)
@@ -121,6 +129,7 @@ class RecitationTracker:
             intro = words("بسم الله الرحمن الرحيم")
             if heard[:len(intro)] == intro:
                 heard = heard[len(intro):]
+                stable_prefix = max(0, stable_prefix - len(intro))
         original = heard[:]
         consumed = 0
         if continuous and self.completed_context:
@@ -132,6 +141,7 @@ class RecitationTracker:
                     and context_pairs[-1][0] == len(self.completed_context) - 1):
                 consumed = context_pairs[-1][1] + 1
                 heard = heard[consumed:]
+                stable_prefix = max(0, stable_prefix - consumed)
         if not heard:
             return self.snapshot(transcript)
         self.last_partial = transcript
@@ -158,17 +168,17 @@ class RecitationTracker:
                 self.stability += 1
             else:
                 self.last_candidate, self.stability = evidence, 1
-            stable = final or self.stability >= 2
+            stable = final or self.stability >= 2 or terminal and end is not None and end < stable_prefix
             if target != self.index and not stable:
                 break
             if target != self.index:
                 for skipped in range(self.index, target):
                     ayah = self.ayahs[skipped]
                     previous = self.results.get(ayah["ayah"], {})
-                    word_results = [dict(word, status="correct" if word["status"] == "correct" else "missed")
+                    word_results = [dict(word, status="correct" if word["status"] == "correct" else "pending" if self.uncertain_audio else "missed")
                                     for word in previous.get("words", self.word_results(skipped, [], [], completed=True))]
                     coverage = sum(word["status"] == "correct" for word in word_results) / max(1, len(word_results))
-                    self.results[ayah["ayah"]] = {"status": "correct" if coverage >= self.threshold else "missed",
+                    self.results[ayah["ayah"]] = {"status": "correct" if coverage >= self.threshold else "listening" if self.uncertain_audio else "missed",
                                                   "score": round(coverage, 3), "final": True,
                                                   "missing": [word["text"] for word in word_results if word["status"] == "missed"],
                                                   "words": word_results}
@@ -195,18 +205,19 @@ class RecitationTracker:
                                   "words": self.word_results(self.index, heard, pairs,
                                                              completed=terminal and stable, boundary=final)}
             if terminal and stable:
-                self.results[ayah].update(status="correct" if score >= self.threshold else "missed", final=True)
+                self.results[ayah].update(status="correct" if score >= self.threshold else "listening" if self.uncertain_audio else "missed", final=True)
                 self.index += 1
                 changed = True
                 self.has_advanced = True
                 consumed += end + 1
                 if continuous:
                     # Bound matcher history to the rolling ASR context.
-                    self.completed_context = original[:consumed][-80:]
+                    self.completed_context = original[:consumed][-self.context_limit:]
                 heard = heard[end + 1:]
+                stable_prefix = max(0, stable_prefix - end - 1)
                 self.last_candidate, self.stability = None, 0
             else:
-                if final and score < self.threshold:
+                if final and score < self.threshold and not self.uncertain_audio:
                     self.results[ayah]["status"] = "missed"
                 break
         return self.snapshot(transcript, changed)

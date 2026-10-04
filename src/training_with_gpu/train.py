@@ -1,4 +1,4 @@
-"""GPU Whisper LoRA: four Qaloon reciters, in-memory caching, optimized for RTX 5070."""
+"""Pinned five-reader DeepDML CLI; legacy recipe helpers retained for inspection."""
 
 import argparse
 import json
@@ -14,7 +14,7 @@ from qaloon_data import DATA_ROOT, RECITER_DIRS, evaluate_model, load_splits
 from train_qaloon_lora import WhisperCollator
 
 
-def parse_args():
+def legacy_parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", choices=["tiny", "base", "small"], default="base")
     p.add_argument("--data-root", type=Path, default=DATA_ROOT)
@@ -84,8 +84,12 @@ class CachedAyahDataset:
         }
 
 
-def main():
-    args = parse_args()
+def legacy_main():
+    """Historical OpenAI/loss-selected recipe, retained for artifact inspection.
+
+    Not the active CLI or approved Qaloon recipe; use main/train_deepdml_lora.
+    """
+    args = legacy_parse_args()
     splits, skipped = load_splits(args.data_root, args.include_reciter, args.exclude_reciter, args.seed)
     
     if args.label_field == "normalized_with_harakat":
@@ -197,6 +201,20 @@ def main():
                 
     (args.output_dir / "metrics.json").write_text(
         json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def parse_args(argv=None):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from src.training_with_gpu.train_deepdml_lora import RECIPE, DEEPDML_BASE, DEEPDML_SMALL
+    from src.training_with_gpu.train_tarteel_lora import parse_args as parse_private
+    return parse_private(argv, RECIPE, allowed_models=(DEEPDML_BASE, DEEPDML_SMALL))
+
+
+def main(argv=None):
+    """Active entry point: pinned five-reader DeepDML, never vanilla fallback."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from src.training_with_gpu.train_deepdml_lora import main as train_private
+    train_private(argv)
 
 
 if __name__ == "__main__":

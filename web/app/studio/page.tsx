@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, BookOpen, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Expand, Headphones, Leaf, Mic, Play, RotateCcw, Search, ShieldCheck, Sparkles, Square, Upload, X } from "lucide-react";
 import type { Manifest, Surah } from "@/lib/types";
 import { useRecitation } from "@/lib/use-recitation";
@@ -12,7 +12,7 @@ import type { TajweedMushaf } from "@/lib/tajweed";
 import { SiteHeader } from "@/components/learn/site-header";
 import { AyahWords } from "@/components/ayah-words";
 import { AyahListen } from "@/components/ayah-listen";
-import { AyahMeaning } from "@/components/ayah-meaning";
+import type { PlaybackCursor } from "@/lib/playback";
 import { ReciterSelector } from "@/components/reciter-selector";
 import { PhoneticAid } from "@/components/phonetic-aid";
 import { TafsirPanel } from "@/components/tafsir-panel";
@@ -34,6 +34,13 @@ export default function Studio() {
   const [fullscreen, setFullscreen] = useState(false), [startAyah, setStartAyah] = useState(1);
   const [showPhonetics, setShowPhonetics] = useState(false), [showTajweed, setShowTajweed] = useState(false);
   const [tajweed, setTajweed] = useState<TajweedMushaf | null>(null), [tajweedError, setTajweedError] = useState(false);
+  const [playback, setPlayback] = useState<PlaybackCursor | null>(null), [focusAyah, setFocusAyah] = useState(1);
+  const followPlayback = useCallback((ayah: number, cursor: PlaybackCursor | null) => {
+    if (cursor) setFocusAyah(ayah);
+    setPlayback(previous => cursor
+      ? previous?.ayah === cursor.ayah && previous.word === cursor.word && previous.tracking === cursor.tracking ? previous : cursor
+      : previous?.ayah === ayah ? null : previous);
+  }, []);
   const textReader = useRef<HTMLDivElement>(null), audioInput = useRef<HTMLInputElement>(null);
   const recitation = useRecitation(surah, startAyah);
   const active = ["connecting", "listening", "stopping"].includes(recitation.state);
@@ -41,7 +48,7 @@ export default function Studio() {
   useEffect(() => { const requested = Number(new URLSearchParams(window.location.search).get("surah")); if (Number.isInteger(requested) && requested >= 1 && requested <= 114) setSelected(requested); }, []);
   useEffect(() => { const controller = new AbortController(); fetch("/quran/manifest.json", { signal: controller.signal }).then(r => { if (!r.ok) throw new Error("Quran assets are not cached. Run the cache script in the README."); return r.json(); }).then(setManifest).catch(e => { if (e.name !== "AbortError") setLoadError(e.message); }); return () => controller.abort(); }, []);
   useEffect(() => {
-    const controller = new AbortController(); setLoading(true); setLoadError(""); setPageIndex(0); stopAudio();
+    const controller = new AbortController(); setLoading(true); setLoadError(""); setPageIndex(0); setFocusAyah(1); setPlayback(null); stopAudio();
     fetch(`/quran/surahs/${String(selected).padStart(3, "0")}.json`, { signal: controller.signal }).then(r => { if (!r.ok) throw new Error("Could not load this surah. Check the local Quran cache."); return r.json(); }).then(data => { setSurah(data); setLoading(false); }).catch(e => { if (e.name !== "AbortError") { setLoadError(e.message); setLoading(false); } });
     return () => controller.abort();
   }, [selected]);
@@ -68,7 +75,11 @@ export default function Studio() {
   const pages = useMemo(() => [...new Set(surah?.ayahs.flatMap(a => a.regions.map(r => r.page)) || [])], [surah]);
   const results = recitation.update?.results || {};
   const current = recitation.update?.current ?? (recitation.state === "complete" ? null : startAyah);
-  const currentAyah = surah?.ayahs.find(a => a.ayah === current);
+  const place = playback?.ayah ?? (active || recitation.state === "complete" ? current : focusAyah);
+  const readingAyah = surah?.ayahs.find(a => a.ayah === place);
+  const liveWords = current ? results[current]?.words || [] : [];
+  const liveWord = active ? liveWords.map((word, index) => word.status === "correct" ? index : -1).filter(index => index >= 0).at(-1) ?? null : null;
+  const wordCursor = (ayah: number) => playback?.ayah === ayah ? playback.word : !playback && active && current === ayah ? liveWord : null;
   const finalized = Object.values(results).filter(r => r.final);
   const wordResults = Object.values(results).flatMap(r => r.words || []);
   const heardWords = wordResults.filter(w => w.status === "correct").length, omittedWords = wordResults.filter(w => w.status === "missed").length;
@@ -76,16 +87,16 @@ export default function Studio() {
   const pagePath = pages[pageIndex], pageInfo = pagePath ? manifest?.pages[pagePath.split("/").pop()!] : null;
   const filtered = manifest?.surahs.filter(s => `${s.id} ${s.name} ${s.arabic}`.toLowerCase().includes(query.toLowerCase())) || [];
   const annotations = new Map(tajweed?.surahs.find(s => s.id === selected)?.ayahs.map(a => [a.ayah, a]) || []);
-  useEffect(() => { const page = currentAyah?.regions[0]?.page; if (page && pages.includes(page)) setPageIndex(pages.indexOf(page)); }, [currentAyah, pages]);
-  useEffect(() => { if (active) { stopAudio(); setMode(current => current === "mushaf" ? "text" : current); } }, [active]);
+  useEffect(() => { const page = readingAyah?.regions[0]?.page; if (page && pages.includes(page)) setPageIndex(pages.indexOf(page)); }, [readingAyah, pages]);
+  useEffect(() => { if (active) { stopAudio(); setPlayback(null); } }, [active]);
   useEffect(() => {
-    if (!active || mode === "mushaf" || !textReader.current || !current) return;
-    const container = textReader.current, ayah = container.querySelector<HTMLElement>(`[data-ayah="${current}"]`);
+    if ((!active && !playback) || mode === "mushaf" || !textReader.current || !place) return;
+    const container = textReader.current, ayah = container.querySelector<HTMLElement>(`[data-ayah="${place}"]`);
     if (!ayah) return;
-    const matched = ayah.querySelectorAll<HTMLElement>(".quran-word.correct"), anchor = matched[matched.length - 1] || ayah;
+    const anchor = ayah.querySelector<HTMLElement>(".playback-word") || ayah;
     const box = anchor.getBoundingClientRect(), top = box.top - container.getBoundingClientRect().top;
     if (top < 0 || top + box.height > container.clientHeight) container.scrollTo({ top: container.scrollTop + top - container.clientHeight / 3, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
-  }, [active, current, mode, recitation.update?.results]);
+  }, [active, place, mode, playback?.word, recitation.update?.results]);
   const selectSurah = (id: number) => { recitation.reset(); stopAudio(); setStartAyah(1); setSelected(id); setPicker(false); setQuery(""); };
   const toggleFullscreen = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { /* Optional. */ } };
 
@@ -102,40 +113,48 @@ export default function Studio() {
         {(loadError || recitation.error) && <div className="error-message" role="alert">{c(loadError || recitation.error, "تعذّر تحميل النص أو الاتصال بالنموذج. تحقّق من الخادم المحلي؛ نتائجك الحالية محفوظة.")}</div>}
         {surah && !surah.trained && <div className="notice">{c("Reading is available; this surah is outside ASR training coverage. Live matching is experimental. Local ayah audio covers Fātiḥah/Juz ʿAmma only.", "القراءة متاحة، لكن السورة خارج نطاق تدريب التعرف الصوتي، والمطابقة تجريبية. المقاطع المحلية تشمل الفاتحة وجزء عمّ فقط.")}</div>}
         {recitation.demo && <div className="demo-banner"><Sparkles size={16} /><strong>{c("Presentation demo", "عرض توضيحي")}</strong>{c("Simulated word-by-word results. No microphone or model inference.", "نتائج محاكاة كلمة بكلمة؛ دون ميكروفون أو استدلال بالنموذج.")}</div>}
-        <section className="reading-tools"><label>{c("Start / resume from ayah", "ابدأ أو استأنف من الآية")}<select aria-label={c("Starting ayah", "آية البداية")} disabled={active} value={startAyah} onChange={e => setStartAyah(Number(e.target.value))}>{surah?.ayahs.map(a => <option key={a.ayah} value={a.ayah}>{a.ayah}</option>)}</select></label>
+        <section className="reading-tools"><label>{c("Start / resume from ayah", "ابدأ أو استأنف من الآية")}<select aria-label={c("Starting ayah", "آية البداية")} disabled={active} value={startAyah} onChange={e => { setStartAyah(Number(e.target.value)); setFocusAyah(Number(e.target.value)); }}>{surah?.ayahs.map(a => <option key={a.ayah} value={a.ayah}>{a.ayah}</option>)}</select></label>
           <label><input type="checkbox" checked={showPhonetics} onChange={e => setShowPhonetics(e.target.checked)} />{c("Show draft Qālūn phonetics", "أظهر النقل الصوتي التجريبي لقالون")}</label>
           <label><input type="checkbox" checked={showTajweed} onChange={e => setShowTajweed(e.target.checked)} />{c("Draft tajweed colors", "ألوان التجويد التجريبية")}</label>
           <span role="status">{c(recitation.connection, active ? "الجلسة متصلة؛ راقب حالة الخادم" : "جاهز")}</span></section>
-        {showTajweed && (tajweed ? <TajweedLegend rules={tajweed.rules} /> : <p role="status">{tajweedError ? c("Tajweed file unavailable. Run build_qalon_tajweed.py; canonical text is unchanged.", "ملف التجويد غير متاح. شغّل مولّد التجويد؛ النص الأصلي لم يتغير.") : c("Loading reviewable annotations…", "جارٍ تحميل العلامات للمراجعة…")}</p>)}
+        {showTajweed && !tajweed && <p role="status">{tajweedError ? c("Tajweed file unavailable. Run build_qalon_tajweed.py; canonical text is unchanged.", "ملف التجويد غير متاح. شغّل مولّد التجويد؛ النص الأصلي لم يتغير.") : c("Loading reviewable annotations…", "جارٍ تحميل العلامات للمراجعة…")}</p>}
         <div className="studio-grid">
-          <section className="mushaf-card" aria-label={c("Quran reader", "قارئ القرآن")}>
+          <aside className="commentary-sidebar" dir={lang === "ar" ? "rtl" : "ltr"} aria-label={c("Translation and tafsir", "الترجمة والتفسير")}>
+            <div className="section-heading"><h2>{c("Translation & tafsir", "الترجمة والتفسير")}</h2><span className="mini-pill">{place ?? "—"}</span></div>
+            <label>{c("Follow ayah", "تابع الآية")}<select aria-label={c("Commentary ayah", "آية التفسير")} value={place || focusAyah} disabled={active || Boolean(playback)} onChange={e => setFocusAyah(Number(e.target.value))}>{surah?.ayahs.map(a => <option key={a.ayah} value={a.ayah}>{a.ayah}</option>)}</select></label>
+            {readingAyah && <div className="ayah-meaning-pane"><TafsirPanel surah={selected} ayah={readingAyah.ayah} inline fixedLanguage="en" /><TafsirPanel surah={selected} ayah={readingAyah.ayah} inline fixedLanguage="ar" /></div>}
+          </aside>
+          <section className="mushaf-card" dir={lang === "ar" ? "rtl" : "ltr"} aria-label={c("Quran reader", "قارئ القرآن")}>
             <div className="reader-toolbar"><span><BookOpen size={17} />{c("The noble Quran", "القرآن الكريم")}</span><div className="view-switch" aria-label={c("Reader view", "طريقة العرض")}>{([
               ["mushaf", c("Mushaf", "المصحف المصوّر")], ["text", c("Ayah view", "النص العربي")], ["phonetic", c("Phonetics", "النقل الصوتي")], ["meaning", c("Meaning + phonetics", "المعنى والنقل الصوتي")],
-            ] as [View, string][]).map(([id, label]) => <button key={id} aria-pressed={mode === id} className={mode === id ? "active" : ""} disabled={id === "mushaf" && active} onClick={() => setMode(id)}>{label}</button>)}</div></div>
+            ] as [View, string][]).map(([id, label]) => <button key={id} aria-pressed={mode === id} className={mode === id ? "active" : ""} onClick={() => setMode(id)}>{label}</button>)}</div></div>
             <div className={`quran-paper ${selected === 1 ? "fatiha" : ""}`}>
               <div className="surah-heading"><Ornament /><div><span className="surah-caption">{c("SURAH", "سورة")} {String(selected).padStart(3, "0")}</span><h2 lang="ar" dir="rtl">سُورَةُ {surah?.arabic || "الفَاتِحَة"}</h2><span>{surah?.name}</span></div><Ornament /></div>
-              {selected !== 9 && mode === "text" && <div className="basmalah" lang="ar" dir="rtl">بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ</div>}
+              {selected !== 9 && mode === "text" && <div className="basmalah" lang="ar" dir="rtl"><AyahWords ayah={{ ayah: 0, text: "بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ", normalized: "بسم الله الرحمن الرحيم", regions: [] }} tajweed={showTajweed ? tajweed?.basmalah : undefined} rules={tajweed?.rules} lang={lang} /></div>}
               {(mode === "phonetic" || mode === "meaning") && <p className="reading-aid-warning">{c("Draft Qālūn reading aid; not teacher-approved. Listen and learn Arabic letters alongside it.", "نقل صوتي تجريبي لقالون لم يعتمده معلم. استمع وتعلّم الحروف العربية معه.")}</p>}
-              {loading ? <div className="reader-placeholder"><Leaf className="loading-leaf" />{c("Preparing your mushaf…", "جارٍ تجهيز المصحف…")}</div> : mode === "mushaf" && pageInfo ? <div className="svg-page" style={{ aspectRatio: pageInfo.viewBox.split(" ").slice(2).join(" / ") }}>
+              {loading || mode === "mushaf" && !pageInfo ? <div className="reader-placeholder"><Leaf className="loading-leaf" />{c("Preparing your mushaf…", "جارٍ تجهيز المصحف…")}</div> : mode === "mushaf" && pageInfo ? <div className="svg-page" style={{ aspectRatio: pageInfo.viewBox.split(" ").slice(2).join(" / ") }}>
                 {/* External SVG remains an image, never executable markup. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={pagePath} alt={c(`Quran page ${pagePath.split("/").pop()?.replace(".svg", "")}`, `صفحة القرآن ${pageIndex + 1}`)} draggable={false} />
-                <svg viewBox={pageInfo.viewBox} aria-label={c("Ayah recitation highlights", "تمييز الآيات")} className="ayah-overlay">{surah?.ayahs.flatMap(a => a.regions.filter(r => r.page === pagePath).map((r, i) => <polygon key={`${a.ayah}-${i}`} points={r.polygon} className={`ayah-region ${surah.preciseGeometry ? results[a.ayah]?.status || "pending" : "pending"}`}><title>{c(`Ayah ${a.ayah}`, `الآية ${a.ayah}`)}</title></polygon>))}</svg>
+                <svg viewBox={pageInfo.viewBox} aria-label={c("Ayah recitation highlights", "تمييز الآيات")} className="ayah-overlay">{surah?.ayahs.flatMap(a => a.regions.filter(r => r.page === pagePath).map((r, i) => <polygon key={`${a.ayah}-${i}`} data-ayah={a.ayah} points={r.polygon} onClick={() => { if (!active && !playback) setFocusAyah(a.ayah); }} className={`ayah-region ${surah.preciseGeometry ? results[a.ayah]?.status || "pending" : "pending"} ${a.ayah === place && (playback || active) ? "playback-ayah" : ""}`}><title>{c(`Ayah ${a.ayah}`, `الآية ${a.ayah}`)}</title></polygon>))}</svg>
               </div> : <div className={`text-mushaf word-mode ${mode === "phonetic" ? "phonetic-text" : mode === "meaning" ? "meaning-text" : ""}`} ref={textReader} lang={mode === "phonetic" ? "en" : "ar"} dir={mode === "phonetic" ? "ltr" : "rtl"}>{surah?.ayahs.map(ayah => {
                 const phonetics = qaloonG2P(ayah.text);
-                return <div key={ayah.ayah} data-ayah={ayah.ayah} className={`text-ayah ${results[ayah.ayah]?.status || (ayah.ayah === current && active ? "listening" : "pending")}`}>
-                  <div className="ayah-reading-line">{mode === "phonetic" ? phonetics.words.map((word, i) => <span key={i}><span className={`quran-word ${results[ayah.ayah]?.words?.[i]?.status || "pending"}`} data-word-index={i}>{word}</span>{" "}</span>) : <AyahWords ayah={ayah} result={results[ayah.ayah]} tajweed={showTajweed ? annotations.get(ayah.ayah) : undefined} rules={tajweed?.rules} lang={lang} />}<span className="ayah-medallion">{ayah.ayah.toLocaleString(lang)}</span></div>
-                  {(showPhonetics && mode === "text" || mode === "meaning") && <PhoneticAid text={ayah.text} />}
+                const cursor = wordCursor(ayah.ayah);
+                const display = (ayah.displayText || ayah.text).replace(/[\u0660-\u0669\d]+/g, "").trim();
+                const phoneticCursor = phonetics.words.length === display.split(/\s+/).length ? cursor : null;
+                return <div key={ayah.ayah} data-ayah={ayah.ayah} onClick={() => { if (!active && !playback) setFocusAyah(ayah.ayah); }} className={`text-ayah ${results[ayah.ayah]?.status || (ayah.ayah === current && active ? "listening" : "pending")} ${playback?.ayah === ayah.ayah ? "playback-ayah" : ""}`}>
+                  <div className="ayah-reading-line">{mode === "phonetic" ? phonetics.words.map((word, i) => <span key={i}><span className={`quran-word ${results[ayah.ayah]?.words?.[i]?.status || "pending"} ${phoneticCursor === i ? "playback-word" : ""}`} data-word-index={i} aria-current={phoneticCursor === i ? "true" : undefined}>{word}</span>{" "}</span>) : <AyahWords ayah={ayah} result={results[ayah.ayah]} tajweed={showTajweed ? annotations.get(ayah.ayah) : undefined} rules={tajweed?.rules} lang={lang} activeWord={cursor} />}<span className="ayah-medallion">{ayah.ayah.toLocaleString(lang)}</span></div>
+                  {(showPhonetics && mode === "text" || mode === "meaning") && <PhoneticAid text={ayah.text} activeWord={phoneticCursor} />}
                   {mode === "phonetic" && phonetics.warnings.length > 0 && <details className="phonetic-review"><summary>{c("Pronunciation review notes", "ملاحظات مراجعة النطق")}</summary><ul>{phonetics.warnings.map(w => <li key={w}>{w}</li>)}</ul></details>}
-                  <AyahListen surah={selected} ayah={ayah.ayah} reciter={reciter} disabled={active} />
-                  {mode === "meaning" && <AyahMeaning surah={selected} ayah={ayah.ayah} />}
+                  <AyahListen surah={selected} ayah={ayah.ayah} reciter={reciter} disabled={active} displayText={display} onPlayback={followPlayback} />
                 </div>;
               })}</div>}
-              {mode === "mushaf" && <><p className="geometry-note">{c("Supplied SVG artwork is not certified Qālūn spelling. Use Ayah view for canonical source text, letter colors and word matching.", "المصحف المصوّر المعروض ليس توثيقًا لرسم قالون. اختر النص العربي لعرض نص المصدر وألوان الحروف والمطابقة.")}</p>{currentAyah && <AyahListen surah={selected} ayah={currentAyah.ayah} reciter={reciter} disabled={active} />}</>}
+              {mode === "mushaf" && <><p className="geometry-note">{c("Supplied SVG artwork is not certified Qālūn spelling. Whole-ayah overlays use draft text-aligned regions, not word timing.", "المصحف المصوّر ليس توثيقًا لرسم قالون. تمييز الآية يعتمد على مناطق ربط نصي تجريبية لا على توقيت الكلمات.")}</p>{readingAyah && <AyahListen surah={selected} ayah={readingAyah.ayah} reciter={reciter} disabled={active} onPlayback={followPlayback} />}</>}
             </div>
             <div className="reader-footer"><div className="legend"><span><i className="correct" />{c("Heard", "مطابق")}</span><span><i className="missed" />{c("Not matched", "غير مطابق")}</span><span><i className="pending" />{c("Not reached", "لم تصل إليه")}</span></div>{mode === "mushaf" && <div className="page-controls"><button aria-label={c("Previous Quran page", "الصفحة السابقة")} disabled={pageIndex === 0} onClick={() => setPageIndex(n => n - 1)}><ChevronLeft size={16} /></button><span>{c("Page", "صفحة")} {pagePath ? Number(pagePath.split("/").pop()?.replace(".svg", "")) : "—"}</span><button aria-label={c("Next Quran page", "الصفحة التالية")} disabled={pageIndex >= pages.length - 1} onClick={() => setPageIndex(n => n + 1)}><ChevronRight size={16} /></button></div>}</div>
+            {showTajweed && tajweed && <TajweedLegend rules={tajweed.rules} legend={tajweed.legend} />}
           </section>
-          <aside className="session-panel">
+          <aside className="session-panel" dir={lang === "ar" ? "rtl" : "ltr"}>
             <ServiceStatus />
             <section className="listening-card"><div className="panel-heading"><span>{c(active ? "LIVE RECITATION" : "RECITATION COMPANION", active ? "تلاوة مباشرة" : "رفيق التلاوة")}</span><Headphones size={17} /></div><div className={`mic-orbit ${recitation.state === "listening" ? "is-listening" : ""}`}><div className="orbit-ring" /><div className="mic-core">{recitation.state === "complete" ? <Check size={31} /> : <Mic size={29} />}</div></div>
               <h2>{c(recitation.state === "connecting" ? "Connecting to your model…" : recitation.state === "stopping" ? "Finishing your recitation…" : recitation.state === "complete" ? "A beautiful step forward." : recitation.state === "listening" ? "We’re listening." : "Your voice. Your journey.", recitation.state === "connecting" ? "جارٍ الاتصال بالنموذج…" : recitation.state === "stopping" ? "جارٍ إنهاء التلاوة…" : recitation.state === "complete" ? "خطوة جميلة إلى الأمام." : recitation.state === "listening" ? "نستمع إليك." : "صوتك، ورحلتك.")}</h2><p>{c(active ? "Keep reciting naturally. Your place follows you, one ayah at a time." : "Take a breath and begin whenever you’re ready.", active ? "تابع التلاوة بطبيعتك؛ نتابع موضعك آية بآية." : "خذ نفسًا وابدأ حين تكون مستعدًا.")}</p>
@@ -143,15 +162,14 @@ export default function Studio() {
               <button className={`start-button ${active ? "recording" : ""}`} disabled={loading || !surah || Boolean(loadError) || recitation.state === "stopping"} onClick={() => { stopAudio(); if (active) recitation.stop(); else void recitation.start(); }}>{active ? <Square size={15} /> : <Mic size={18} />}{c(recitation.state === "connecting" ? "Cancel" : recitation.state === "stopping" ? "Processing…" : active ? "Finish recitation" : recitation.state === "complete" ? "Recite again" : "Begin recitation", recitation.state === "connecting" ? "إلغاء" : recitation.state === "stopping" ? "جارٍ المعالجة…" : active ? "إنهاء التلاوة" : recitation.state === "complete" ? "اتلُ مرة أخرى" : "ابدأ التلاوة")}</button>
               <input ref={audioInput} type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac" hidden aria-label={c("Choose audio recording", "اختر تسجيلًا صوتيًا")} onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) { stopAudio(); void recitation.start(file); } }} />
               <button className="upload-button" disabled={active || loading || !surah || Boolean(loadError)} onClick={() => audioInput.current?.click()}><Upload size={15} />{c("Upload audio to test", "ارفع تسجيلًا للتجربة")}</button>
-              {recitation.fileName && <div className="upload-file-note"><strong>{recitation.fileName}</strong><span>{c("Silent replay · real model results", "إعادة تشغيل صامتة · نتائج حقيقية للنموذج")}</span></div>}
+               {recitation.fileName && <div className="upload-file-note"><strong>{recitation.fileName}</strong><span>{c("Accelerated local processing · real model results", "معالجة محلية مُسرّعة · نتائج حقيقية للنموذج")}</span></div>}
               <div className="privacy-note"><ShieldCheck size={13} />{c("Inference is local. Reference listening uses cached audio.", "الاستدلال محلي، والاستماع يستخدم المقاطع المحفوظة.")}</div>
               {!active && recitation.state !== "complete" && <button className="demo-link" disabled={!surah || loading} onClick={recitation.startDemo}><Play size={12} />{c("Try the presentation demo", "جرّب العرض التوضيحي")}</button>}
             </section>
             <section className="progress-card"><div className="section-heading"><h3>{c("Your session", "جلستك")}</h3><button className="icon-button" aria-label={c("Reset session", "أعد ضبط الجلسة")} disabled={active} onClick={recitation.reset}><RotateCcw size={15} /></button></div><div className="progress-title"><strong>{finalized.length}<span> / {surah?.ayahCount || 7} {c("ayahs", "آيات")}</span></strong><span>{progress}%</span></div><div className="progress-track"><span style={{ width: `${progress}%` }} /></div><div className="stat-row"><div><CheckCircle2 size={15} /><strong>{heardWords}</strong><span>{c("Heard words", "كلمات مطابقة")}</span></div><div><CircleHelp size={15} /><strong>{omittedWords}</strong><span>{c("Unmatched words", "كلمات غير مطابقة")}</span></div><div><strong>{Math.floor(recitation.seconds / 60)}:{String(recitation.seconds % 60).padStart(2, "0")}</strong><span>{c("Time", "الوقت")}</span></div></div></section>
-            <section className="current-card"><div className="section-heading"><h3>{c("Your place", "موضعك")}</h3><span className="mini-pill">{current ? c(`Ayah ${current}`, `الآية ${current}`) : c("Complete", "اكتملت")}</span></div>{currentAyah && (mode === "phonetic" ? <p className="current-phonetic" lang="en" dir="ltr">{qaloonG2P(currentAyah.text).text}</p> : <p lang="ar" dir="rtl" className="current-text"><AyahWords ayah={currentAyah} result={results[currentAyah.ayah]} lang={lang} /></p>)}<p className="current-hint">{c("Matching tracks recognized text, not pronunciation or tajweed correctness.", "المطابقة تتابع النص المتعرَّف عليه، وليست حكمًا على النطق أو التجويد.")}</p></section>
+            <section className="current-card"><div className="section-heading"><h3>{c("Your place", "موضعك")}</h3><span className="mini-pill">{place ? c(`Ayah ${place}`, `الآية ${place}`) : c("Complete", "اكتملت")}</span></div>{readingAyah && (mode === "phonetic" ? <p className="current-phonetic" lang="en" dir="ltr">{qaloonG2P(readingAyah.text).text}</p> : <p lang="ar" dir="rtl" className="current-text"><AyahWords ayah={readingAyah} result={results[readingAyah.ayah]} lang={lang} /></p>)}<p className="current-hint">{c("Matching tracks recognized text, not pronunciation or tajweed correctness.", "المطابقة تتابع النص المتعرَّف عليه، وليست حكمًا على النطق أو التجويد.")}</p></section>
           </aside>
         </div>
-        {currentAyah && mode !== "meaning" && <TafsirPanel surah={selected} ayah={currentAyah.ayah} />}
         {recitation.update?.transcript && <section className="transcript-card"><span className="field-label">{c(recitation.demo ? "SIMULATED TRANSCRIPT" : "WHAT THE MODEL HEARD", recitation.demo ? "نص محاكاة" : "ما تعرَّف عليه النموذج")}</span><p lang="ar" dir="rtl">{recitation.update.transcript}</p></section>}
         <footer className="footer"><span><Leaf size={13} />{c("Made for mindful recitation.", "للتلاوة بتدبر.")}</span><span>{c("Recognition aid, not a tajweed assessment.", "وسيلة تعرف صوتي، وليست تقييمًا للتجويد.")} <button onClick={() => setHelp(true)}>{c("Learn more", "اعرف المزيد")}</button></span></footer>
       </main>

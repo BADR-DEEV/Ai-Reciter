@@ -49,7 +49,7 @@ export function stopAudio() {
 }
 
 /** Play a file (optionally a [start, end) segment in ms). Resolves when playback ends or is replaced. */
-export async function playUrl(url: string, start = 0, end?: number, onStart?: () => void): Promise<"ended" | "stopped" | "failed"> {
+export async function playUrl(url: string, start = 0, end?: number, onStart?: () => void, onProgress?: (seconds: number, duration: number) => void): Promise<"ended" | "stopped" | "failed"> {
   const ctx = unlock(); // Must run synchronously inside the click handler.
   stopAudio();
   const token = generation;
@@ -63,11 +63,20 @@ export async function playUrl(url: string, start = 0, end?: number, onStart?: ()
     source.buffer = buffer;
     source.connect(ctx.destination);
     current = source;
-    onStart?.();
     const offset = start / 1000;
+    const duration = end !== undefined ? Math.min(buffer.duration - offset, Math.max(0.05, (end - start) / 1000)) : buffer.duration - offset;
+    const started = ctx.currentTime;
+    let frame = 0;
+    const tick = () => {
+      if (token !== generation || current !== source) return;
+      onProgress?.(Math.min(duration, Math.max(0, ctx.currentTime - started)), duration);
+      frame = requestAnimationFrame(tick);
+    };
     source.start(0, offset, end !== undefined ? Math.max(0.05, (end - start) / 1000) : undefined);
+    onStart?.();
+    if (onProgress) tick();
     return await new Promise(resolve => {
-      source.onended = () => { if (current === source) current = null; resolve(token === generation ? "ended" : "stopped"); };
+      source.onended = () => { cancelAnimationFrame(frame); if (current === source) current = null; resolve(token === generation ? "ended" : "stopped"); };
     });
   } catch {
     return "failed";

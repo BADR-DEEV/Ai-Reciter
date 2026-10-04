@@ -82,10 +82,12 @@ def load_splits(data_root=DATA_ROOT, include=None, exclude=None, seed=42,
 def audio_features(processor, path):
     """Read validated 16 kHz mono PCM clips without implicit resampling."""
     import soundfile as sf
+    import numpy as np
 
     audio, sample_rate = sf.read(path, dtype="float32")
-    if sample_rate != 16000 or audio.ndim != 1:
-        raise ValueError(f"Expected mono 16 kHz WAV: {path} ({sample_rate} Hz, {audio.shape})")
+    if (sample_rate != 16000 or audio.ndim != 1 or not len(audio)
+            or len(audio) > 30 * sample_rate or not np.isfinite(audio).all()):
+        raise ValueError(f"Expected nonempty finite <=30s mono 16 kHz WAV; never silently truncate: {path} ({sample_rate} Hz, {audio.shape})")
     return processor.feature_extractor(audio, sampling_rate=16000).input_features[0]
 
 
@@ -124,11 +126,19 @@ def score_predictions(references, hypotheses):
     return {"wer": wer(references, hypotheses), "cer": cer(references, hypotheses)}
 
 
-def evaluate_model(model, processor, rows, batch_size=4):
+def evaluate_model(model, processor, rows, batch_size=4, normalizer_version=None):
     """Greedy Arabic transcription, scored against the stored ASR labels."""
     import torch
     sys.path.insert(0, str(DATA_ROOT))
-    from qaloon_audio2text import normalize_quran_for_asr
+    from qaloon_audio2text import normalizer_for_version
+    if not rows or batch_size <= 0:
+        raise ValueError("Nonempty evaluation rows and positive batch size required")
+    versions = {row.get("normalizer_version", "qaloon-asr-v1") for row in rows}
+    if normalizer_version is None:
+        if len(versions) != 1:
+            raise ValueError("Mixed label-normalizer versions require explicitly matched references")
+        normalizer_version = versions.pop()
+    normalize_quran_for_asr = normalizer_for_version(normalizer_version)
 
     model.eval()
     device = next(model.parameters()).device
@@ -145,6 +155,8 @@ def evaluate_model(model, processor, rows, batch_size=4):
                 language="arabic", task="transcribe", num_beams=1,
             )
         predictions = processor.tokenizer.batch_decode(tokens, skip_special_tokens=True)
+        if len(predictions) != len(batch):
+            raise ValueError("Decoder output count differs from frozen evaluation batch")
         for row, prediction in zip(batch, predictions):
             reference = row["text_asr_normalized"].strip()
             hypothesis = normalize_quran_for_asr(prediction)

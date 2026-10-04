@@ -34,12 +34,21 @@ class WhisperCollator:
             [{"input_features": item["input_features"]} for item in examples],
             return_tensors="pt",
         )
+        if all("attention_mask" in item for item in examples):
+            import numpy as np
+            import torch
+            features["attention_mask"] = torch.as_tensor(np.stack([item["attention_mask"] for item in examples]), dtype=torch.long)
         targets = self.processor.tokenizer.pad(
             [{"input_ids": item["labels"]} for item in examples], return_tensors="pt"
         )
         labels = targets.input_ids.masked_fill(targets.attention_mask.ne(1), -100)
-        if (labels[:, 0] == self.decoder_start_token_id).all():
-            labels = labels[:, 1:]
+        if not (labels[:, 0] == self.decoder_start_token_id).all():
+            raise ValueError("Every Whisper target must start with the matching decoder BOS")
+        labels = labels[:, 1:]
+        for row in labels:
+            valid = row[row.ne(-100)]
+            if not len(valid) or valid[-1].item() != self.processor.tokenizer.eos_token_id:
+                raise ValueError("EOS must remain a supervised token, never masked as padding")
         features["labels"] = labels
         return features
 

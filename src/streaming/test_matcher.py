@@ -8,6 +8,15 @@ def tracker(*texts):
 
 
 class MatcherTests(unittest.TestCase):
+    def test_hafs_malik_cannot_be_colored_as_qaloon_malik(self):
+        self.assertEqual(alignment(["ملك"], ["مالك"]), [])
+        result = tracker("ملك يوم الدين").feed("مالك يوم الدين", final=True)
+        self.assertNotEqual(result["results"][1]["words"][0]["status"], "correct")
+
+    def test_stale_normalized_cache_is_rebuilt_from_source_text(self):
+        t = RecitationTracker([{"ayah": 1, "text": "ٱلْقِيَٰمَةِ", "normalized": "القامة"}])
+        self.assertEqual(t.ayahs[0]["normalized"], "القيامة")
+
     def test_retained_completed_context_does_not_mark_future_ayah(self):
         t = tracker("الحمد لله رب العالمين", "الرحمن الرحيم", "ملك يوم الدين")
         t.feed("الحمد لله رب العالمين", final=True, continuous=True)

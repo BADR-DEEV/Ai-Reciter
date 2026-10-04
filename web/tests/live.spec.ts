@@ -36,7 +36,7 @@ test("uploaded recording uses the GPU without requesting a microphone", async ({
   await expect(page.getByRole("button", { name: "Upload audio to test" })).toBeEnabled();
   await page.getByRole("button", { name: "Upload audio to test" }).click();
   await page.getByLabel("Choose audio recording").setInputFiles(audio!);
-  await expect(page.locator(".upload-file-note")).toContainText("Silent replay");
+  await expect(page.locator(".upload-file-note")).toContainText("Accelerated local processing");
   await expect(page.locator('.text-ayah[data-ayah="1"]')).toHaveClass(/correct/, { timeout: 18000 });
   await expect(page.locator('.text-ayah[data-ayah="2"]')).toHaveClass(/missed/, { timeout: 15000 });
   await expect(page.getByRole("button", { name: "Upload audio to test" })).toBeEnabled({ timeout: 30000 });
