@@ -91,34 +91,78 @@ colours on and off.
 
 ## The tajweed model
 
-The plain model writes words. The tajweed model writes the same words, each followed by one tag
-token per audible rule on it, for example
-`ان<tj:ghunna> الذين كفروا سواء<tj:madd_muttasil> عليهم اانذرتهم<tj:tasheel><tj:ikhfa> …`.
-Stripping the tags gives exactly the plain target, so the server matches words the same way and
-reads the tags separately. The 17 tags (`src/tajweed/model_tokens.txt`) cover ghunna, ikhfāʾ,
-iqlāb, the idghāms, qalqala, madd lāzim and muttaṣil, ṣilah, tas-hīl, imāla, ibdāl, isqāṭ and
-naql. Optional ways (munfaṣil length, mīm al-jamʿ ṣilah) and spelling notes get no tag.
+The plain model writes words. The tajweed model writes the same words, each followed by one token
+per audible rule on it, for example
+`ان<n_ghunna> الذين كفروا سواء<mad> عليهم اانذرتهم<tasheel><n_ikhfa> …`.
+Stripping the tokens gives exactly the plain target, so the server matches words the same way and
+reads the tokens separately.
+
+### Tokens
+
+The tokens follow the acoustic-driven design of the "Evaluating Automatic Speech Recognition" report
+(Table 4.6, Ḥafṣ): rules that sound alike share one token, rules without an acoustic marker get none.
+They are adapted to Qālūn:
+
+| Token | Rules (engine ids) | Qālūn note |
+| --- | --- | --- |
+| `<n_ikhfa>` | ikhfāʾ of nūn/tanwīn | |
+| `<m_ikhfa>` | iqlāb, lip ikhfāʾ | same labial ghunna |
+| `<n_ghunna>` | nūn mushaddada, incl. full idghām into nūn | token on the doubled letter |
+| `<m_ghunna>` | mīm mushaddada, incl. idghām of nūn/mīm into mīm | token on the doubled letter |
+| `<idgham_ghunna>` | idghām into ي و | |
+| `<qalqala>` | qalqala (sākin and at the stop) | |
+| `<mad>` | madd lāzim (6), muttaṣil (4), opening letters | **not** munfaṣil: Qālūn reads it 2 or 4 |
+| `<tasheel>` | tas-hīl of a hamza | Qālūn |
+| `<silah>` | ṣilah of the pronoun hā | |
+
+Idghām without ghunna, iẓhār and the optional ways (munfaṣil length, mīm al-jamʿ ṣilah) get no token.
+The server still reads the first model's `<tj:name>` tags and renames them.
+
+### Negatives: plain reading
+
+A model trained only on sheikhs who apply every rule learns where rules belong from the text and
+then "hears" them everywhere. The report measured a 115% tajweed error rate on plain audio, and
+mixing in about 30% plain synthetic readings brought it to about 0. `src/tajweed/prepare_data.py` does
+the same with Meta's MMS Arabic TTS (`facebook/mms-tts-ara`, CC-BY-NC-4.0): three takes per ayah
+(different seeds and speaking rates), kept only when rattil-v4 reads the words (WER ≤ 0.25).
+They get targets with no tokens.
+
+### Training v2 (10 readers + negatives, from v4)
 
 ```bash
-# 1. labels (one per ayah, plus clip-specific ones for multi-ayah clips)
-python -m src.tajweed.targets --reader-root data/hf/qaloon-reciter-dataset --reader-root data/hf/qaloon-new-reciters
+# data: the ten approved readers (unapproved/ and audit_flagged clips are left out) and Waleed for testing
+python src/deployment/pull_hf_assets.py --models v4 --datasets qaloon-all-reciters qaloon-reciter-experiments
+PYTHONPATH=src/deployment/mac_shim python -m src.tajweed.prepare_data --reader-root data/hf/qaloon-all-reciters \
+  --waleed data/hf/qaloon-reciter-experiments/dataset_qaloon_waleed --out data/tajweed
+python -m src.tajweed.targets --reader-root data/hf/qaloon-all-reciters --reader-root data/tajweed --out data/tajweed/labels.jsonl
 
-# 2. train from the production model (training PC)
-python src/training_with_gpu/train_base_full.py --init-model runs/rattil_qaloon_v3 \
+python src/training_with_gpu/train_base_full.py --init-model runs/rattil_qaloon_v4 \
   --label-field text_tajweed --labels-jsonl data/tajweed/labels.jsonl --extra-tokens src/tajweed/model_tokens.txt \
-  --reader-root data/hf/qaloon-reciter-dataset --reader-root data/hf/qaloon-new-reciters \
-  --reciters huthaify husary dokali abusnaina akri daawob deeban kshidan qeniwa \
-  --augment-profile speaker-robust --learning-rate 5e-5 --epochs 10 --patience 3 \
-  --output-dir runs/rattil_qaloon_tajweed_v1
+  --reader-root data/hf/qaloon-all-reciters --reader-root data/tajweed \
+  --reciters huthaify husary dokali garu daawob abusnaina qeniwa akri deeban kshidan ttsplain waleed \
+  --holdout-reciter waleed --augment-profile speaker-robust --learning-rate 5e-5 --epochs 5 --patience 2 \
+  --output-dir runs/rattil_qaloon_tajweed_v2
 
-# 3. serve: the default command already offers it once the folder exists; ahkam
-#    sessions take words from the plain model and tags from this one
-python -m src.streaming.serve --model rattil-v3
+# serve: words from v4, tokens from the newest tajweed model (v2 once its folder exists)
+python -m src.streaming.serve --model rattil-v4 --beams 3
 ```
 
 Checkpoints are selected by `tajweed_score` = tag F1 − macro WER (`--select-by`), so a run
 keeps the epoch with the best tags without accepting worse word recognition. Continuing a
 tagged run (`--init-model` a tajweed checkpoint) reuses its tag embeddings.
+
+### How to test
+
+1. **Numbers** (printed at the end of training, in `metrics.json`):
+   - `holdout` per-reciter WER and token precision/recall on **Waleed**, a voice never trained on.
+   - token precision on the **ttsplain** rows: how often the model invents a rule in plain reading.
+     It should stay near 1.0 (no false alarms).
+   - `test` token F1 on unseen ayahs of the trained voices.
+2. **In the app**: start the server, open `/studio`, switch on "Check my ahkam" and recite, or
+   upload a clip. The "What to fix" card lists each missed rule with the word and how to fix it;
+   click one to jump to the word. Test both a careful recitation and a deliberately plain one:
+   the plain one should list missed ghunna, madd and qalqala.
+3. **Code**: `python -m unittest src.tajweed.test_engine src.tajweed.test_targets src.streaming.test_tajweed_tags`.
 
 ### Results so far (proof of concept on this Mac)
 
