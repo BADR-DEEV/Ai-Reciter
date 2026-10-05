@@ -124,8 +124,9 @@ A model trained only on sheikhs who apply every rule learns where rules belong f
 then "hears" them everywhere. The report measured a 115% tajweed error rate on plain audio, and
 mixing in about 30% plain synthetic readings brought it to about 0. `src/tajweed/prepare_data.py` does
 the same with Meta's MMS Arabic TTS (`facebook/mms-tts-ara`, CC-BY-NC-4.0): three takes per ayah
-(different seeds and speaking rates), kept only when rattil-v4 reads the words (WER ≤ 0.25).
-They get targets with no tokens.
+(different seeds and speaking rates), kept only when rattil-v4 reads the letters (character
+error ≤ 0.25; v4 has only heard sheikhs, so its word error on flat TTS speech is high even when
+the letters are right). 973 of 1,695 takes were kept. They get targets with no tokens.
 
 ### Training v2 (10 readers + negatives, from v4)
 
@@ -148,42 +149,59 @@ python -m src.streaming.serve --model rattil-v4 --beams 3
 ```
 
 Checkpoints are selected by `tajweed_score` = tag F1 − macro WER (`--select-by`), so a run
-keeps the epoch with the best tags without accepting worse word recognition. Continuing a
-tagged run (`--init-model` a tajweed checkpoint) reuses its tag embeddings.
+keeps the epoch with the best tags without accepting worse word recognition. Each clip's
+errors are capped at its word count (`capped_macro_wer`): in the first v2 run one clip that
+repeated a word 73 times pushed epoch 3's WER to 59% and the run kept epoch 1, although epoch 3
+was the better ahkam model (below). Continuing a tagged run (`--init-model` a tajweed
+checkpoint) reuses its tag embeddings.
 
 ### How to test
 
-1. **Numbers** (printed at the end of training, in `metrics.json`):
-   - `holdout` per-reciter WER and token precision/recall on **Waleed**, a voice never trained on.
-   - token precision on the **ttsplain** rows: how often the model invents a rule in plain reading.
-     It should stay near 1.0 (no false alarms).
-   - `test` token F1 on unseen ayahs of the trained voices.
+1. **Ahkam mode end to end** (`src/tajweed/evaluate.py`): words from the plain model, tokens from the
+   tajweed model aligned onto them, exactly as the server does it.
+
+   ```bash
+   PYTHONPATH=src/deployment/mac_shim python -m src.tajweed.evaluate --plain runs/rattil_qaloon_v4 \
+     --tajweed runs/rattil_qaloon_tajweed_v2 --reader-root data/tajweed --reciters waleed ttsplain --device mps
+   ```
+
+   - **waleed**: a voice never trained on, reciting correctly. `token_recall` = expected rules
+     heard, `token_precision` = heard tokens that belong there.
+   - **ttsplain**: plain TTS readings of ayahs outside the training split. `false_alarms_per_word`
+     = tokens the model invents where no rule was applied. Lower is better.
+   - **An unseen plain voice.** The TTS negatives are one voice, so a model could learn "this voice
+     has no tajweed". Read non-train ayahs with another voice and score it the same way, e.g. the
+     macOS Arabic voice: `say -v Majed -o 083017.wav --data-format=LEI16@16000 "<text_asr_normalized>"`
+     in a `dataset_qaloon_majed` folder with `"tajweed": false` rows, then `--reciters majed`.
 2. **In the app**: start the server, open `/studio`, switch on "Check my ahkam" and recite, or
    upload a clip. The "What to fix" card lists each missed rule with the word and how to fix it;
    click one to jump to the word. Test both a careful recitation and a deliberately plain one:
    the plain one should list missed ghunna, madd and qalqala.
 3. **Code**: `python -m unittest src.tajweed.test_engine src.tajweed.test_targets src.streaming.test_tajweed_tags`.
 
-### Results so far (proof of concept on this Mac)
+### Results
 
-Only three readers are on this Mac (Huthaify, Husary, Dokali: 1,388 training clips, Juz ʿAmma
-and al-Fātiḥah), trained on MPS from `rattil_qaloon_v3`:
+**v2** (installed as `runs/rattil_qaloon_tajweed_v2`): ten readers (5,036 training clips) plus
+the plain TTS negatives, from rattil-v4, speaker-robust augmentation, lr 5e-5. Early stopping ended
+the run after epoch 3. Ahkam mode (v4 words + tajweed tokens), greedy decoding:
 
-| Run | Tag precision | Tag recall | Tag F1 | Word error |
+| Tajweed model | Waleed precision | Waleed recall | False alarms / word, TTS plain | False alarms / word, Majed plain (unseen voice) |
 | --- | --- | --- | --- | --- |
-| v1: lr 2e-5, 5 epochs (validation) | 0.52 | 0.40 | 0.45 | 3.2% |
-| v2: continued at lr 5e-5, 8 epochs, best of 8 by `tajweed_score` (test) | 0.94 | 0.69 | 0.80 | 10.3% |
-| **Ahkam mode: plain model's words + v2's tags (test, 170 clips)** | **0.94** | **0.66** | | **2.3%** |
+| v1 (3 readers, no negatives) | 0.83 | 0.84 | 0.130 | 0.147 |
+| v2, epoch 1 (kept by the uncapped score) | 0.93 | 0.83 | 0.006 | 0.045 |
+| **v2, epoch 3 (installed)** | **0.99** | **0.94** | **0.006** | **0.019** |
 
-v2 is installed as `runs/rattil_qaloon_tajweed_v1`, so `python -m src.streaming.serve --model rattil-v3`
-serves both. The higher learning rate that taught the tags cost the tajweed model word accuracy
-(محفوظ heard as "محسن"), so in ahkam mode the server runs both models (`PairedEngine` in
-`src/streaming/server.py`): words and matching come from the plain model, and the tajweed model's
-tags are aligned onto those words (`transfer_tags`). Both decodes take about 0.2 s per 9 s of audio
-on the Mac CPU.
+Waleed: 562 clips; TTS: 182 takes; Majed: 104 ayahs. Word error in ahkam mode is v4's: 2.1% on
+Waleed. The tajweed model alone at epoch 3 had 59% validation WER because of a few looping clips,
+which ahkam mode does not use. On the unseen plain voice the negatives cut invented tokens 7.7×
+relative to v1; on the TTS voice they were trained with, the cut is 21×, so part of that effect is
+the voice. Over-generation is reduced but not gone.
 
-These numbers are on unseen ayahs of the same three voices, and v3 has already heard all of
-them, so word error rate is optimistic. Tag F1 is the meaningful number.
+**v1** (proof of concept, three readers on this Mac, from rattil-v3): 13 epochs in two runs. Tag F1
+rose from 0.45 (5 epochs at lr 2e-5) to 0.80 (8 more at 5e-5), while the tajweed model's own word
+error grew from 3% to 10%. That forgetting is why ahkam mode takes words from the plain model
+(`PairedEngine` in `src/streaming/server.py`, `transfer_tags`). Both decodes take about 0.2 s per
+9 s of audio on the Mac CPU.
 
 ### What the model can and cannot judge yet
 
@@ -191,8 +209,8 @@ All training audio is correct recitation by sheikhs, so the model has never hear
 ghunna or a short madd. It learns where rules belong and some of how they sound, so "missed"
 should be read as "the model did not hear it", not as a verdict. To make it a real judge:
 
-1. Train on all ten readers on the training PC (above), with speaker-robust augmentation.
-2. Add negatives. Learners from Ḥafṣ are the most common Qālūn mistake, so record or collect
+1. Done in v2: all ten readers with speaker-robust augmentation, and plain TTS negatives.
+2. Ḥafṣ negatives. Learners from Ḥafṣ are the most common Qālūn mistake, so record or collect
    Ḥafṣ recitations of the same ayahs and label them with Ḥafṣ realisations (no tas-hīl, full
    hamza, Ḥafṣ farsh). The aligner in `hafs.py` already finds every place the two differ.
 3. Duration negatives: with a forced alignment of letters, shorten madd and ghunna segments by

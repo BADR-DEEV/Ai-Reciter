@@ -25,17 +25,17 @@ from src.training.qaloon_data import split_name
 from .feedback import compare
 
 
-def load(model_dir):
+def load(model_dir, device="cpu"):
     from transformers import WhisperForConditionalGeneration, WhisperProcessor
     processor = WhisperProcessor.from_pretrained(model_dir)
-    model = WhisperForConditionalGeneration.from_pretrained(model_dir).eval()
+    model = WhisperForConditionalGeneration.from_pretrained(model_dir).to(device).eval()
     return processor, model
 
 
 def decode(bundle, audio, keep_tags):
     import torch
     processor, model = bundle
-    features = processor(audio, sampling_rate=16000, return_tensors="pt").input_features
+    features = processor(audio, sampling_rate=16000, return_tensors="pt").input_features.to(model.device)
     with torch.no_grad():
         ids = model.generate(features, language="arabic", task="transcribe", max_new_tokens=300)
     if not keep_tags:
@@ -87,8 +87,9 @@ def main():
     parser.add_argument("--reader-root", type=Path, required=True)
     parser.add_argument("--reciters", nargs="+", required=True)
     parser.add_argument("--limit", type=int, default=10000)
+    parser.add_argument("--device", default="cpu", help="cpu or mps (greedy decoding works on mps; batched beams hang there)")
     args = parser.parse_args()
-    plain, tajweed = load(args.plain), load(args.tajweed)
+    plain, tajweed = load(args.plain, args.device), load(args.tajweed, args.device)
     report = {reciter: evaluate(rows_for(args.reader_root, reciter, args.limit), plain, tajweed) for reciter in args.reciters}
     print(json.dumps({"plain": str(args.plain), "tajweed": str(args.tajweed), **report}, ensure_ascii=False, indent=1))
 

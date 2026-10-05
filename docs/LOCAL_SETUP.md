@@ -67,10 +67,11 @@ shows that button. Set `RATTIL_PYTHON` if `python3` isn't the Python with
 
 ```bash
 # Terminal 1: inference API on :8000 (plain model + tajweed model side by side)
-python -m src.streaming.serve --model rattil-v3
-#   also offers tajweed=rattil-tajweed-v1 (runs/rattil_qaloon_tajweed_v1); it loads on first
-#   use once that folder exists, and requests fall back to plain until then.
-#   explicit: --models plain=rattil-v3,tajweed=runs/rattil_qaloon_tajweed_v1
+python -m src.streaming.serve --model rattil-v4
+#   also offers tajweed=rattil-tajweed-v2 (runs/rattil_qaloon_tajweed_v2, else v1) for
+#   "Check my ahkam": words come from v4, tajweed tokens from the tajweed model. Requests fall
+#   back to plain while no tajweed folder exists. The tajweed models are local (not on HF).
+#   explicit: --models plain=rattil-v4,tajweed=runs/rattil_qaloon_tajweed_v2
 #   other presets: gpu-full-base (old team model), deepdml (adapter, training PC only)
 
 # Terminal 2: web on :3000 (the API only accepts origins on port 3000)
@@ -112,7 +113,7 @@ what reads it and where it comes from. Restart `next dev` after changing the fla
 ## Limits
 
 The plain models recognise recited words; they do not judge tajweed. The tajweed model
-(`docs/QALOON_TAJWEED.md`) adds tags for audible rules, but it is an early model trained only
-on correct recitations. They were tested on
+(`docs/QALOON_TAJWEED.md`) adds tags for audible rules. It was trained on correct recitations
+plus synthetic plain readings, not on learners' real mistakes, so treat "missed" as "not heard". They were tested on
 professional reciters, not learners. Source recordings' licenses are not
 established, so keep the models and datasets private.

@@ -7,6 +7,9 @@ from unittest.mock import patch
 from .model_options import MODEL_PRESETS, ModelSpec, check_model, models_from_env, parse_models, select_model, resolve_local_model, with_tajweed_slot
 from .serve import main, parse_args
 
+# The tajweed slot takes v2 when its folder exists on this machine, else v1.
+NEWEST_TAJWEED = "rattil-tajweed-v2" if MODEL_PRESETS["rattil-tajweed-v2"].is_dir() else "rattil-tajweed-v1"
+
 
 class ModelSelectionTests(unittest.TestCase):
     def setUp(self):
@@ -42,7 +45,7 @@ class ModelSelectionTests(unittest.TestCase):
         with patch.dict(os.environ, {"RECITER_NUM_BEAMS": "5"}), patch("uvicorn.run") as run:
             main(["--model", "deepdml", "--model-path", str(self.adapter.parent)])
             self.assertEqual(os.environ["RECITER_MODEL_PATH"], str(self.adapter))
-            self.assertTrue(os.environ["RECITER_MODELS"].startswith(f"plain=deepdml:{self.adapter},tajweed=rattil-tajweed-v1:"))
+            self.assertTrue(os.environ["RECITER_MODELS"].startswith(f"plain=deepdml:{self.adapter},tajweed={NEWEST_TAJWEED}:"))
             self.assertEqual(os.environ["RECITER_ALLOW_EXPERIMENTAL_ADAPTER"], "1")
             self.assertNotIn("RECITER_NUM_BEAMS", os.environ)
             run.assert_called_once_with("src.streaming.server:app", host="127.0.0.1", port=8000, workers=1, ws_max_size=16384)
@@ -81,7 +84,7 @@ class ModelSelectionTests(unittest.TestCase):
 
     def test_tajweed_slot_and_entries_round_trip(self):
         specs = with_tajweed_slot(parse_models([f"plain={self.full}"]))
-        self.assertEqual(specs["tajweed"].preset, "rattil-tajweed-v1")
+        self.assertEqual(specs["tajweed"].preset, NEWEST_TAJWEED)
         self.assertEqual(parse_models([",".join(s.entry() for s in specs.values())]), specs)
         self.assertEqual(list(with_tajweed_slot(parse_models(["mine=rattil-tajweed-v1", "rattil-v3"]))), ["mine", "plain"])
 
