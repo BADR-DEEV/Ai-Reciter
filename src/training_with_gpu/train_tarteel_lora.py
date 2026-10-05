@@ -17,6 +17,7 @@ from src.training.qaloon_data import load_splits, DATA_ROOT
 from src.training.experiment_data import experimental_candidates, recording_safe_splits
 from src.training.reviewed_audio import sha256
 from train_base_full import configure_generation, AugmentedAyahDataset, TARTEEL_MODEL, MODEL_REVISIONS
+from augment import PROFILES, Augmenter, build_config, configure_spec_augment
 from src.training_with_gpu.decoding_safety import DECODE_PROFILES, save_decoding_bundle, load_private_adapter
 
 
@@ -43,6 +44,8 @@ def parse_args(argv=None, recipe=None, allowed_models=None):
     p.add_argument("--learning-rate", type=float, default=1e-5)
     p.add_argument("--decode-profile", choices=DECODE_PROFILES, default="beam3")
     p.add_argument("--eval-steps", type=int, default=39, help="Generated development evaluation/save interval; 0 uses epochs")
+    p.add_argument("--augment-profile", choices=PROFILES, default="legacy", help="legacy uses --noise-prob/--speed-prob/--tempo-*")
+    p.add_argument("--aug", action="append", default=[], metavar="FIELD=VALUE", help="Override one AugmentConfig field")
     p.add_argument("--noise-prob", type=float, default=.05)
     p.add_argument("--speed-prob", type=float, default=.1)
     p.add_argument("--label-field", choices=["text_asr_normalized", "normalized_with_harakat"], default="normalized_with_harakat")
@@ -71,6 +74,10 @@ def parse_args(argv=None, recipe=None, allowed_models=None):
         p.error("Positive finite ordered tempo range required")
     if args.require_training_audit and not args.quarantine_manifest:
         p.error("Provide the actual local --quarantine-manifest; no screenshot exclusions can be invented")
+    try:
+        build_config(args.augment_profile, args.aug)
+    except ValueError as error:
+        p.error(str(error))
     return args
 
 
@@ -194,6 +201,9 @@ def main(argv=None, recipe=None, allowed_models=None):
     (args.output_dir / "unadapted_development_predictions.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in control_details), encoding="utf-8")
     print("Unadapted DEVELOPMENT control:", control_metrics["overall"], control_metrics["decoding_safety"], flush=True)
     base.config.use_cache = False
+    augmenter = None if args.augment_profile == "legacy" else Augmenter(build_config(args.augment_profile, args.aug), args.seed)
+    if augmenter:
+        print("SpecAugment:", configure_spec_augment(base.config, augmenter.config), flush=True)
     model = get_peft_model(base, LoraConfig(r=args.rank, lora_alpha=args.alpha, lora_dropout=.1, revision=MODEL_REVISIONS[args.init_model],
                                           target_modules=args.target_modules, bias="none"))
     model.enable_input_require_grads()
@@ -252,7 +262,7 @@ def main(argv=None, recipe=None, allowed_models=None):
         logging_steps=10, dataloader_num_workers=0, report_to="none", seed=args.seed, data_seed=args.seed)
     trainer = BalancedTrainer(model=model, args=training_args,
         train_dataset=AugmentedAyahDataset(splits["train"], processor, args.label_field, args.noise_prob, args.speed_prob,
-            (args.tempo_min, args.tempo_max) if args.tempo_min is not None else None),
+            (args.tempo_min, args.tempo_max) if args.tempo_min is not None else None, augmenter=augmenter),
         eval_dataset=AugmentedAyahDataset(splits["validation"], processor, args.label_field),
         data_collator=WhisperCollator(processor, model.config.decoder_start_token_id), compute_metrics=compute_metrics,
         callbacks=[EarlyStoppingCallback(early_stopping_patience=args.patience), GeneralizationMonitor()])
