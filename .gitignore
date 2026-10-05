@@ -165,3 +165,4 @@ web/playwright-report/
 # Local symlinks into the main checkout (worktrees)
 /web/node_modules
 /web/public/quran
+/runs

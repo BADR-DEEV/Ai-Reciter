@@ -3,19 +3,36 @@
 A tag belongs to the PRECEDING word; a tag before any word is dropped. Tags are
 removed before normalization/matching, so word matching never depends on them.
 """
+from difflib import SequenceMatcher
 import re
 
 TAG = re.compile(r"<\s*tj\s*:\s*([a-z_]+)\s*>")
 
 
 def tokens(text):
-    """[(word, [tags])] in transcript order, tolerant of spaces around tags."""
-    out = []
-    for i, part in enumerate(TAG.split(text or "")):
-        if not i % 2:
-            out.extend((word, []) for word in part.split())
-        elif out and part not in out[-1][1]:
-            out[-1][1].append(part)
+    """[(word, [tags])] in transcript order. A tag belongs to the word it sits in
+    or follows; removing a tag never splits a word (the model sometimes emits a
+    tag after a sub-word piece) and spaces around tags are tolerated."""
+    text = text or ""
+    pieces, marks, last = [], [], 0
+    for match in TAG.finditer(text):
+        pieces.append(text[last:match.start()])
+        marks.append((sum(map(len, pieces)), match.group(1)))
+        last = match.end()
+    pieces.append(text[last:])
+    clean = "".join(pieces)
+    words = [(m.group(), m.start(), m.end()) for m in re.finditer(r"\S+", clean)]
+    out = [(word, []) for word, _, _ in words]
+    for position, tag in marks:
+        owner = None
+        for i, (_, start, end) in enumerate(words):
+            if start < position <= end:
+                owner = i
+                break
+            if end <= position:
+                owner = i
+        if owner is not None and tag not in out[owner][1]:
+            out[owner][1].append(tag)
     return out
 
 
@@ -63,3 +80,19 @@ def carry_tags(previous, previous_tags, prefix, raw, raw_tags):
     start = 0 if not n else next((i for i in range(len(previous) - n + 1) if previous[i:i + n] == prefix), None)
     carried = previous_tags[start:start + n] if start is not None and len(previous_tags) == len(previous) else [[] for _ in prefix]
     return carried + raw_tags[len(raw_tags) - len(raw):]
+
+
+def transfer_tags(plain, tagged, normalize=str.split):
+    """The plain transcript's words, each carrying the tags the tajweed model
+    heard on the same word. Words are aligned on their normalized spelling; a
+    run of equally many differing words is aligned by position."""
+    plain_words = (plain or "").split()
+    heard = tokens(tagged)
+    a = [" ".join(normalize(w)) for w in plain_words]
+    b = [" ".join(normalize(w)) for w, _ in heard]
+    tags = [[] for _ in plain_words]
+    for op, i1, i2, j1, j2 in SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if op == "equal" or (op == "replace" and i2 - i1 == j2 - j1):
+            for k in range(i2 - i1):
+                tags[i1 + k] = heard[j1 + k][1]
+    return " ".join(word + "".join(f"<tj:{t}>" for t in word_tags) for word, word_tags in zip(plain_words, tags))

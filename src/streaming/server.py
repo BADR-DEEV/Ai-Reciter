@@ -19,7 +19,7 @@ from .live_buffer import AudioQueue, TranscriptOverlap
 from . import practice as lessons
 from src.training_with_gpu.decoding_safety import load_private_adapter, generation_diagnostics
 from .model_options import ROOT, ModelSpec, default_name, models_from_env, resolve_local_model
-from .tajweed_tags import TAG, carry_tags, strip_tags, tag_list, tagged_words
+from .tajweed_tags import TAG, carry_tags, strip_tags, tag_list, tagged_words, transfer_tags
 
 ASSETS = ROOT / "web" / "public" / "quran"
 ORIGINS = set(os.environ.get("RECITER_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(","))
@@ -126,6 +126,43 @@ class Engine:
         return transcript, lessons.candidate_logprobs(self.model, self.processor.tokenizer, features, candidates)
 
 
+class PairedEngine:
+    """Ahkam mode: words from the plain engine, tags from the tajweed engine.
+
+    Fine-tuning for tags costs the tajweed model some word accuracy, so its
+    words are only used to align its tags onto the plain engine's words. Both
+    decodes run under the plain engine's (per-device) lock."""
+    def __init__(self, plain, tajweed):
+        self.plain, self.tajweed = plain, tajweed
+        self.last_diagnostics = None
+
+    def __getattr__(self, name):  # device, lock, model_name, precision, num_beams, ...
+        return getattr(self.plain, name)
+
+    def _tags(self, plain_text, decode):
+        self.last_diagnostics = getattr(self.plain, "last_diagnostics", None)
+        if not plain_text:
+            return plain_text
+        try:
+            return transfer_tags(plain_text, decode(), words)
+        except Exception:
+            logger.exception("Tajweed tagging failed; returning words only")
+            return plain_text
+
+    def transcribe(self, audio):
+        return self._tags(self.plain.transcribe(audio), lambda: self.tajweed.transcribe(audio))
+
+    def transcribe_live(self, audio, final=False):
+        def live(engine):
+            decoder = getattr(engine, "transcribe_live", None)
+            return decoder(audio, final) if decoder else engine.transcribe(audio)
+        return self._tags(live(self.plain), lambda: live(self.tajweed))
+
+    def check(self, audio, candidates):
+        transcript, logprobs = self.plain.check(audio, candidates)
+        return self._tags(transcript, lambda: self.tajweed.transcribe(audio)), logprobs
+
+
 class ModelUnavailable(Exception):
     def __init__(self, message, status=503):
         super().__init__(message)
@@ -194,6 +231,9 @@ class Registry:
         else:
             engine = await self.load(name)
             if engine is not None:
+                plain = self.engines.get(self.default)
+                if self.specs[name].kind == "tajweed" and plain is not None and self.specs[self.default].kind != "tajweed":
+                    return PairedEngine(plain, engine), name, None
                 return engine, name, None
             if self.specs[name].kind != "tajweed" or name == self.default:
                 raise ModelUnavailable(f"Model {name!r} is not available on this server.")

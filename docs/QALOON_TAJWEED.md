@@ -111,7 +111,8 @@ python src/training_with_gpu/train_base_full.py --init-model runs/rattil_qaloon_
   --augment-profile speaker-robust --learning-rate 5e-5 --epochs 10 --patience 3 \
   --output-dir runs/rattil_qaloon_tajweed_v1
 
-# 3. serve: the default command already offers it once the folder exists
+# 3. serve: the default command already offers it once the folder exists; ahkam
+#    sessions take words from the plain model and tags from this one
 python -m src.streaming.serve --model rattil-v3
 ```
 
@@ -124,7 +125,18 @@ tagged run (`--init-model` a tajweed checkpoint) reuses its tag embeddings.
 Only three readers are on this Mac (Huthaify, Husary, Dokali: 1,388 training clips, Juz ʿAmma
 and al-Fātiḥah), trained on MPS from `rattil_qaloon_v3`:
 
-RESULTS_TABLE
+| Run | Tag precision | Tag recall | Tag F1 | Word error |
+| --- | --- | --- | --- | --- |
+| v1: lr 2e-5, 5 epochs (validation) | 0.52 | 0.40 | 0.45 | 3.2% |
+| v2: continued at lr 5e-5, 8 epochs, best of 8 by `tajweed_score` (test) | 0.94 | 0.69 | 0.80 | 10.3% |
+| **Ahkam mode: plain model's words + v2's tags (test, 170 clips)** | **0.94** | **0.66** | | **2.3%** |
+
+v2 is installed as `runs/rattil_qaloon_tajweed_v1`, so `python -m src.streaming.serve --model rattil-v3`
+serves both. The higher learning rate that taught the tags cost the tajweed model word accuracy
+(محفوظ heard as "محسن"), so in ahkam mode the server runs both models (`PairedEngine` in
+`src/streaming/server.py`): words and matching come from the plain model, and the tajweed model's
+tags are aligned onto those words (`transfer_tags`). Both decodes take about 0.2 s per 9 s of audio
+on the Mac CPU.
 
 These numbers are on unseen ayahs of the same three voices, and v3 has already heard all of
 them, so word error rate is optimistic. Tag F1 is the meaningful number.
