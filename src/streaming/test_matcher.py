@@ -132,6 +132,33 @@ class MatcherTests(unittest.TestCase):
         self.assertEqual(t.feed("بسم الله الرحمن الرحيم", final=True)["results"], {})
         self.assertEqual(t.feed("بسم الله الرحمن الرحيم الحمد لله رب العالمين", final=True)["current"], 2)
 
+    def test_istiadha_before_basmalah_does_not_skip_fatiha_ayah_one(self):
+        # Real stream (Daawob): the isti'adha came first, with its first word misheard.
+        t = RecitationTracker([{"ayah": 1, "normalized": "الحمد لله رب العالمين"},
+                               {"ayah": 2, "normalized": "الرحمن الرحيم"},
+                               {"ayah": 3, "normalized": "ملك يوم الدين"}], surah=1)
+        # The pause after the basmalah is decoded as a boundary before الحمد arrives.
+        update = t.feed("اروذ بالله من الشيطان الرجيم بسم الله الرحمن الرحيم", final=True, continuous=True)
+        self.assertEqual(update["results"], {})
+        update = t.feed("اروذ بالله من الشيطان الرجيم بسم الله الرحمن الرحيم الحمد لله رب العالمين "
+                        "الرحمن الرحيم ملك يوم الدين", final=True, continuous=True)
+        self.assertEqual(update["results"][1]["status"], "correct")
+        self.assertEqual(update["results"][1]["missing"], [])
+
+    def test_basmalah_is_stripped_at_the_start_of_any_surah(self):
+        t = RecitationTracker([{"ayah": 1, "normalized": "قل هو الله احد"},
+                               {"ayah": 2, "normalized": "الله الصمد"}], surah=112)
+        self.assertEqual(t.feed("بسم الله الرحمن الرحيم", final=True, continuous=True)["results"], {})
+        update = t.feed("بسم الله الرحمن الرحيم قل هو الله احد الله الصمد", final=True, continuous=True)
+        self.assertTrue(update["complete"])
+        self.assertTrue(all(r["status"] == "correct" for r in update["results"].values()))
+
+    def test_partial_opening_phrase_is_not_stripped(self):
+        # Two matching words are not an isti'adha; never drop recited ayah words on weak evidence.
+        t = RecitationTracker([{"ayah": 1, "normalized": "من شر الوسواس الخناس"}], surah=114)
+        update = t.feed("من شر الوسواس الخناس", final=True)
+        self.assertEqual(update["results"][1]["status"], "correct")
+
     def test_multiple_ayahs_in_one_decode(self):
         t = tracker("قل هو الله احد", "الله الصمد")
         result = t.feed("قل هو الله احد الله الصمد", final=True)
