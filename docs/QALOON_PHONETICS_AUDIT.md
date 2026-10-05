@@ -6,8 +6,9 @@ listening, Arabic-script learning or instruction by a qualified teacher.
 
 ## Files
 
-- Rules: `web/lib/qaloon-g2p.ts` (`qaloon-orthographic-0.1`).
-- Reader component: `web/components/phonetic-aid.tsx`; opt-in in the studio.
+- Rules: `web/lib/qaloon-g2p.ts` (`qaloon-orthographic-0.2`; 0.2 reads tanwin fatḥ on a final alif).
+- Reader component: `web/components/phonetic-aid.tsx`; opt-in in the studio, on by default
+  under English challenge choices (`web/app/games/page.tsx`).
 - Audit generator: `web/scripts/phonetics-audit.cjs`.
 - Full local audit: **`docs/generated/qaloon-phonetics-audit.csv`** (6,210 cached
   Qālūn ayahs), plus `phonetics-summary.json`.

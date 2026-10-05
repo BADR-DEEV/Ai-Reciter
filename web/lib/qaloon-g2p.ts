@@ -2,7 +2,7 @@
  * Qālūn source vowels are retained, never replaced with a Hafs transliteration.
  * Every result remains draft until a qualified Qālūn reviewer signs it off.
  */
-export const G2P_VERSION = "qaloon-orthographic-0.1";
+export const G2P_VERSION = "qaloon-orthographic-0.2";
 export type Phonetics = { text: string; words: string[]; warnings: string[]; status: "draft"; version: string };
 const consonants: Record<string, string> = {
   "ء": "ʾ", "أ": "ʾ", "إ": "ʾ", "ؤ": "ʾ", "ئ": "ʾ", "ب": "b", "ت": "t", "ث": "th",
@@ -101,6 +101,8 @@ function renderWord(word: string, joined: boolean, pause: boolean, warnings: Set
         if (!vowel) warnings.add("Unvowelled initial alif/hamzat al-wasl needs a reviewed starting vowel.");
         output += vowel || "⟨?⟩";
       } else if (output.endsWith("a")) output = output.slice(0, -1) + "ā";
+      // Maghrebi spelling puts tanwin fatḥ on the final alif (قَدْحاٗ), not on the consonant before it.
+      else if (vowel === "an" && last) output += pause ? "ā" : "an";
       else if (vowel) { output += "ʾ" + vowel; warnings.add("Medial alif onset needs hamza/wasl review."); }
       else warnings.add("Unresolved alif (silent versus long vowel); review the word.");
       continue;

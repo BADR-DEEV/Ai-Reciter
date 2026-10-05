@@ -52,8 +52,11 @@ python src/learning/build_audio_similarity.py --reciter huthaify
 # Optional alternate-reciter indexes, if their datasets exist:
 python src/learning/build_audio_similarity.py --reciter husary
 python src/learning/build_audio_similarity.py --reciter dokali
+# Challenge distractors (docs/CHALLENGE_DISTRACTORS.md); training is optional
+python src/learning/train_ayah_embedder.py
+python src/learning/build_text_embeddings.py
 
-python -m unittest src.learning.test_tajweed src.learning.test_review_audio -v
+python -m unittest src.learning.test_tajweed src.learning.test_review_audio src.learning.test_text_embeddings -v
 python -m unittest src.dataset_collection.test_segment_and_slice -v
 python -m unittest src.training.test_reviewed_audio src.training_with_gpu.test_tarteel_training -v
 python -m unittest src.deployment.test_restore_local_full -v

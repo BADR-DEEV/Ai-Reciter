@@ -1,6 +1,6 @@
 import { readFile, access } from "node:fs/promises";
 import path from "node:path";
-import { corpusVerses, type Verse, type AcousticIndex } from "./challenges";
+import { corpusVerses, type Verse, type AcousticIndex, type EmbeddingTable, type TextIndex } from "./challenges";
 import { DEFAULT_RECITER, RECITERS, referenceURL, type ReciterID } from "./reciters";
 import type { Surah } from "./types";
 const publicRoot = path.join(process.cwd(), "public/quran");
@@ -47,4 +47,24 @@ export async function loadAcoustic(reciter: ReciterID = DEFAULT_RECITER): Promis
     const data = JSON.parse(await readFile(path.join(publicRoot, `audio-similarity-${reciter}.json`), "utf8"));
     return data.reciter_key === reciter && data.method && data.neighbors ? data : null;
   } catch { return null; }
+}
+
+type TableFile = { scales: number[]; vectors: string };
+function table(keys: string[], file: TableFile, dim: number): EmbeddingTable {
+  const bytes = Buffer.from(file.vectors, "base64");
+  if (!Number.isInteger(dim) || dim <= 0 || file.scales.length !== keys.length || bytes.length !== keys.length * dim) throw new Error("Malformed embedding table");
+  return { index: new Map(keys.map((k, i) => [k, i])), dim, values: new Int8Array(bytes.buffer, bytes.byteOffset, bytes.length), scales: Float32Array.from(file.scales) };
+}
+let textIndex: Promise<TextIndex | null> | null = null;
+/** Optional (src/learning/build_text_embeddings.py); challenges fall back to spelling similarity without it. */
+export function loadTextIndex(): Promise<TextIndex | null> {
+  if (!textIndex) textIndex = readFile(path.join(publicRoot, "text-embeddings.json"), "utf8").then(raw => {
+    const data = JSON.parse(raw);
+    return { model: String(data.label || data.model), method: data.method, ayahs: table(data.ayahs.ids, data.ayahs, data.dim), words: table(data.words.keys, data.words, data.dim) };
+  }).catch(() => {
+    // Retry later: the first-run build may still be writing the index.
+    setTimeout(() => { textIndex = null; }, 60_000);
+    return null;
+  });
+  return textIndex;
 }

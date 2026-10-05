@@ -12,6 +12,9 @@ test("rule fixtures retain Qaloon malik, vowels and pause behavior", () => {
   expect(qaloonG2P("بِسْمِ اَ۬للَّهِ").text).toBe("bismi llāh");
   expect(qaloonG2P("قُلْ هُوَ اَ۬للَّهُ أَحَدٌ").text).toBe("qul huwa llāhu ʾaḥad");
   expect(qaloonG2P("مَلِكِ", "connect").text).toBe("maliki");
+  // Tanwin fatḥ written on the final alif, not a hamza before "an".
+  expect(qaloonG2P("فَالْمُغِيرَٰتِ صُبْحاٗ").text).toBe("fal-mughīrāti ṣubḥā");
+  expect(qaloonG2P("فَالْمُغِيرَٰتِ صُبْحاٗ", "connect").text).toBe("fal-mughīrāti ṣubḥan");
 });
 
 test("uncertain marks and disjoint letters are reviewable, never approved", () => {

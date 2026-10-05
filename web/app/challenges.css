@@ -35,6 +35,14 @@
 .challenge-option{display:flex;flex-direction:column;align-items:stretch;gap:14px;padding:16px;border:2px solid var(--line);border-radius:16px;background:var(--paper);min-width:0}
 .challenge-option>button[role=radio]{width:100%;padding:12px;text-align:center;line-height:1.8;border-radius:10px}
 .challenge-option>button[lang=ar]{font-size:24px}
+.option-translit{display:block;font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5;color:var(--green);margin-top:6px;overflow-wrap:anywhere}
+.challenge-options.stacked{grid-template-columns:1fr}
+.order-parts{display:flex;flex-direction:column;gap:12px;text-align:start}
+.order-part{display:flex;gap:12px;align-items:flex-start}
+.order-part>b{flex:none;display:grid;place-items:center;width:26px;height:26px;margin-top:8px;border-radius:50%;background:var(--mint);color:var(--green);font:600 13px 'DM Sans',sans-serif}
+.order-part>span{min-width:0}
+.order-part [lang=ar]{display:block;font-size:22px}
+.order-part .option-translit{text-align:right}
 .challenge-option.picked{border-color:var(--green)}
 .challenge-option.right{border-color:var(--green);background:var(--green-wash)}
 .challenge-option.wrong{border-color:var(--red);background:var(--red-wash)}

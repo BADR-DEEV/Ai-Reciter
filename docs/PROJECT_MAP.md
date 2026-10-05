@@ -18,6 +18,7 @@
 | ASR metrics/comparison | `src/training/asr_metrics.py`, `src/training_with_gpu/compare_asr_runs.py` |
 | Live recitation/product | `src/streaming`, `web/app/studio`, `web/lib/playback.ts` |
 | Challenge/learner policy | `web/lib/challenges.ts`, `web/lib/adaptive-challenges.ts`, `web/app/games` |
+| Challenge distractor model | `src/learning/{qursim,benchmark_text_embeddings,train_ayah_embedder,build_text_embeddings}.py` → `web/public/quran/text-embeddings.json` (`docs/CHALLENGE_DISTRACTORS.md`) |
 
 Dataset folders contain the other readers' usual `metadata.jsonl`/`audio/` schema,
 paired `audio_raw/`, honest `coverage.jsonl`, review/provenance bundles and audits.

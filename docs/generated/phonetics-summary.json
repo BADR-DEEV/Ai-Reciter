@@ -1,7 +1,7 @@
 {
-  "version": "qaloon-orthographic-0.1",
+  "version": "qaloon-orthographic-0.2",
   "ayahs": 6210,
-  "flagged": 5427,
+  "flagged": 5413,
   "approved": 0,
   "source": "cached QaloonData_v10 via Quran cache",
   "note": "Hafs columns are only mapped comparison, never replacement labels or scholarly approval."

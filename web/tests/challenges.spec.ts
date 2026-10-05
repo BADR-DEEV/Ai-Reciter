@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { makeChallenge, type Verse, type ChallengeMode } from "../lib/challenges";
+import { makeChallenge, wordKey, type Verse, type ChallengeMode, type EmbeddingTable, type TextIndex } from "../lib/challenges";
 const verses: Verse[] = [
   { surah: 1, name: "One", ayah: 1, text: "word one alpha", normalized: "word one alpha", audio: "/1.wav", duration: 3 },
   { surah: 1, name: "One", ayah: 2, text: "word two beta", normalized: "word two beta", audio: "/2.wav", duration: 4 },
@@ -80,4 +80,63 @@ test("challenge and profile pages fit on a phone", async ({ page }) => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
   }
+});
+
+// Five verses whose 2-d "embeddings" put 1:3 next to 2:1 in meaning and 3:1 far away.
+const fakeIndex = (vectors: Record<string, [number, number]>): TextIndex => {
+  const table = (ids: string[]): EmbeddingTable => ({
+    index: new Map(ids.map((id, i) => [id, i])), dim: 2,
+    values: Int8Array.from(ids.flatMap(id => vectors[id].map(x => Math.round(x * 127)))), scales: new Float32Array(ids.length).fill(1 / 127),
+  });
+  return { model: "fake", method: "test", ayahs: table(Object.keys(vectors)), words: table([]) };
+};
+const ring: Verse[] = Array.from({ length: 12 }, (_, i) => ({ surah: 10 + i, name: `S${i}`, ayah: 1, text: `ayah ${i}`, normalized: `ayah ${i}` }));
+const vectors = Object.fromEntries(ring.map((v, i) => [`${v.surah}:1`, [Math.cos(i / 4), Math.sin(i / 4)] as [number, number]]));
+
+test("text embeddings rank the closest ayahs as hard choices and keep easy ones further away", () => {
+  const index = fakeIndex(vectors);
+  const pool = [{ surah: 9, name: "Prompt", ayah: 1, text: "start", normalized: "start" }, { surah: 9, name: "Prompt", ayah: 2, text: "ayah 0", normalized: "ayah 0x" }, ...ring.slice(1)];
+  index.ayahs.index.set("9:2", 0);
+  const hard = makeChallenge(pool, "next", "hard", null, () => 0, "en", index);
+  const hardIDs = hard.options.filter((_, i) => i !== hard.answer).map(o => ring.findIndex(v => v.text === o.label));
+  expect(Math.max(...hardIDs)).toBeLessThanOrEqual(6);
+  expect(hard.similarity).toContain("embeddings");
+  const surahs = makeChallenge(ring, "surah", "hard", null, () => 0, "en", index);
+  const picked = ring.findIndex(v => v.name === surahs.options[surahs.answer].label);
+  for (const option of surahs.options) expect(Math.abs(ring.findIndex(v => v.name === option.label) - picked)).toBeLessThanOrEqual(4);
+});
+
+test("the prompt is never offered as its own next ayah", () => {
+  const pool: Verse[] = [
+    { surah: 1, name: "A", ayah: 1, text: "alif one", normalized: "alif one" },
+    { surah: 1, name: "A", ayah: 2, text: "alif two", normalized: "alif two" },
+    { surah: 2, name: "B", ayah: 1, text: "ba one", normalized: "ba one" },
+    { surah: 3, name: "C", ayah: 1, text: "jim one", normalized: "jim one" },
+  ];
+  for (let i = 0; i < 20; i++) expect(makeChallenge(pool, "next", "hard").options.map(o => o.label)).not.toContain("alif one");
+});
+
+test("missing-word choices never differ from the answer only by vowels or Qālūn marks", () => {
+  expect(wordKey("اَ۬لنَّاسِ")).toBe(wordKey("اِ۬لنَّاسُ"));
+  // Same expectations as src/learning/test_text_embeddings.py: the index keys must match.
+  for (const [word, key] of [["اَ۬لنَّاسِ", "الناس"], ["يَوْمَئِذٖ", "يوميذ"], ["أَعْمَٰلَهُمْ", "اعملهم"], ["اُ۬لْقُرْءَانَ", "القرءان"]]) expect(wordKey(word)).toBe(key);
+  const pool: Verse[] = ["قُلْ أَعُوذُ بِرَبِّ اِ۬لنَّاسِ", "مَلِكِ اِ۬لنَّاسُ كُلِّهِمْ", "مِن شَرِّ اِ۬لْوَسْوَاسِ", "إِلَٰهِ اِ۬لنَّاسَ جَمِيعًا"]
+    .map((text, i) => ({ surah: 114, name: "An-Nas", ayah: i + 1, text, normalized: text }));
+  for (let i = 0; i < 30; i++) {
+    const q = makeChallenge(pool, "missing", "hard");
+    const keys = q.options.map(o => wordKey(o.label));
+    expect(new Set(keys).size).toBe(3);
+  }
+});
+
+test("ayah order distractors get closer with difficulty and carry each ayah separately", () => {
+  const hard = makeChallenge(verses, "order", "hard", null, () => 0.25);
+  const right = hard.options[hard.answer].parts!;
+  expect(right).toEqual(["word one alpha", "word two beta", "word three gamma"]);
+  for (const option of hard.options) {
+    expect(option.parts).toHaveLength(3);
+    expect(option.parts!.filter((part, i) => part === right[i]).length).toBeGreaterThanOrEqual(1);
+  }
+  const easy = makeChallenge(verses, "order", "easy", null, () => 0.25);
+  expect(easy.options.filter((_, i) => i !== easy.answer).every(o => o.parts![0] !== right[0])).toBe(true);
 });

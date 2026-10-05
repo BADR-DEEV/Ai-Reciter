@@ -145,7 +145,12 @@ including one simulated within-ayah omission.
 
 - `/games`: next-ayah recall (blind local AI transcription or choices), match
   three real Qālūn audio clips, identify a surah, restore a word, and order ayahs.
-  Choose difficulty and Fātiḥah/Juz ʿAmma or whole-Quran text scope.
+  Choose difficulty and Fātiḥah/Juz ʿAmma or whole-Quran text scope. Wrong answers
+  are ranked by an Arabic ayah embedder (fine-tuned from the best of eight Hugging
+  Face models on QurSim) plus spelling, rhyme and length, so harder levels offer
+  closer, more confusable choices. See
+  [`docs/CHALLENGE_DISTRACTORS.md`](docs/CHALLENGE_DISTRACTORS.md).
+  Every Arabic choice shows a draft Latin transliteration; it is on by default in English.
 - `/profile`: name + **demo password** stored only as a salted PBKDF2 hash in
   localStorage, with per-profile progress. This is not real authentication;
   never reuse a real password. No cloud sync or recovery.

@@ -45,6 +45,9 @@ background. Each one runs only if its output is missing:
 
 1. `cache_quran_pages.py --skip-metadata`: Quran page SVGs, geometry and per-surah text (~350 MB).
 2. `src/learning/build_qalon_tajweed.py`: the tajweed draft `web/public/quran/qalon_majwad_mushaf.json` (about 1 s).
+   Alongside the audio step, `src/learning/build_text_embeddings.py` writes `text-embeddings.json`, the ayah
+   and word embeddings behind challenge distractors (~1 min; downloads a ~0.5 GB model unless
+   `runs/rattil_ayah_embed/` exists). Optional; see `docs/CHALLENGE_DISTRACTORS.md`.
 3. `pull_hf_assets.py --readers-only`: Huthaify, Husary and Dokali reference audio (~330 MB).
    Progress goes to `data/hf/pull-status.json` and is served at `/api/reader-audio`.
 4. Once the readers are present, `build_audio_similarity.py` builds listening-distractor

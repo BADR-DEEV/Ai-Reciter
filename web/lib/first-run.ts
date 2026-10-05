@@ -9,10 +9,10 @@ const ROOT = path.resolve(process.cwd(), "..");
 const QURAN = path.join(process.cwd(), "public/quran");
 const exists = (p: string) => access(p).then(() => true, () => false);
 
-function run(label: string, args: string[]) {
+function run(label: string, args: string[], env: Record<string, string> = {}) {
   return new Promise<boolean>(resolve => {
     console.log(`[rattil] ${label}…`);
-    const child = spawn(process.env.RATTIL_PYTHON || "python3", args, { cwd: ROOT, stdio: ["ignore", "ignore", "pipe"] });
+    const child = spawn(process.env.RATTIL_PYTHON || "python3", args, { cwd: ROOT, stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, ...env } });
     let errors = "";
     child.stderr.on("data", chunk => { errors = (errors + chunk).slice(-4000); });
     child.on("error", error => { console.warn(`[rattil] ${label}: could not start Python (${error.message}). Set RATTIL_PYTHON.`); resolve(false); });
@@ -29,6 +29,12 @@ export async function firstRunSetup() {
   if (!await exists(manifest)) await run("First run: caching Quran pages and text (~350 MB)", ["src/dataset_collection/cache_quran_pages.py", "--skip-metadata"]);
   if (await exists(manifest) && !await exists(path.join(QURAN, "qalon_majwad_mushaf.json")))
     await run("First run: generating the tajweed draft", ["src/learning/build_qalon_tajweed.py"]);
+  // Optional, and independent of audio, so it runs alongside the reader download. Challenges fall back to
+  // spelling similarity without it. Downloads the embedding model (~0.5 GB) unless runs/rattil_ayah_embed exists.
+  // The Mac shim hides Anaconda's broken torchvision from transformers; elsewhere it changes nothing.
+  if (await exists(manifest) && !await exists(path.join(QURAN, "text-embeddings.json")))
+    void run("First run: embedding ayahs and words for challenge choices", ["src/learning/build_text_embeddings.py"],
+      { PYTHONPATH: [path.join(ROOT, "src/deployment/mac_shim"), process.env.PYTHONPATH].filter(Boolean).join(path.delimiter) });
 
   const audio = await startReaderAudioDownload();
   if (audio.state !== "ready") {

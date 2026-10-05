@@ -113,6 +113,10 @@ async function data(): Promise<DataEntry[]> {
     fileEntry("Quran text", "Hafs numbering reference", path.join(pub, "hafs-reference.json"), "cache script (numbering alignment only)", "quran-json (jsdelivr mirror)"),
     fileEntry("Quran text", "Qālūn ↔ Hafs text mapping", path.join(pub, "text-mapping.json"), "cache script", cache),
     fileEntry("Learning", "Tajweed draft", path.join(pub, "qalon_majwad_mushaf.json"), "/api/tajweed", "src/learning/build_qalon_tajweed.py"),
+    fileEntry("Learning", "Ayah & word embeddings", path.join(pub, "text-embeddings.json"), "/api/challenges (falls back to spelling similarity)", "src/learning/build_text_embeddings.py ← runs/rattil_ayah_embed or Hugging Face", async b => {
+      const m = await json<{ model?: string; ayahs?: { ids?: unknown[] }; words?: { keys?: unknown[] } }>(path.join(pub, "text-embeddings.json"));
+      return `${m?.model ?? "?"} · ${m?.ayahs?.ids?.length ?? "?"} ayahs · ${m?.words?.keys?.length ?? "?"} words · ${mb(b)}`;
+    }),
     ...RECITERS.map(r => fileEntry("Learning", `Audio similarity · ${r.name}`, path.join(pub, `audio-similarity-${r.id}.json`), "/api/challenges (falls back to text similarity)", "src/learning/build_audio_similarity.py")),
     Promise.resolve({ group: "External", name: "Tafsir & translation", path: "http://api.quran-tafseer.com", present: true, detail: "remote API, fetched per request", readBy: "/api/tafsir (server-side proxy)", source: "Quran Tafseer API" }),
   ];
