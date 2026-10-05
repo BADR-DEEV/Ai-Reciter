@@ -54,6 +54,29 @@ class MatcherTests(unittest.TestCase):
         self.assertTrue(result["results"][1]["final"])
         self.assertEqual(result["results"][1]["words"][-1]["status"], "missed")
 
+    def test_fast_reading_jump_credits_ayahs_heard_in_the_same_window(self):
+        # A fast reader's misheard final word (حسابا -> حسبا) made the matcher jump to the
+        # furthest matching ayah and mark 78:37 missed although every word of it was heard.
+        t = tracker("جزاء من ربك عطاء حسابا",
+                    "رب السماوات والارض وما بينهما الرحمن لا يملكون منه خطابا",
+                    "يوم يقوم الروح والملائكة صفا لا يتكلمون الا من اذن له الرحمن وقال صوابا")
+        update = t.feed("جزاء من ربك عطاء حسبا رب السماوات والارض وما بينهما الرحمن لا يملكون منه خطابا "
+                        "يوم يقوم الروح والملائكة صفا لا يتكلمون الا من اذن له الرحمن وقال صوابا",
+                        final=True, continuous=True)
+        self.assertEqual(update["results"][2]["status"], "correct")
+        self.assertTrue(all(w["status"] == "correct" for w in update["results"][2]["words"]))
+        # حسبا is close enough to حسابا for the fuzzy word match, as before the fix.
+        self.assertEqual(update["results"][1]["status"], "correct")
+
+    def test_fast_reading_jump_still_marks_a_really_skipped_ayah(self):
+        t = tracker("جزاء من ربك عطاء حسابا",
+                    "رب السماوات والارض وما بينهما الرحمن لا يملكون منه خطابا",
+                    "يوم يقوم الروح والملائكة صفا لا يتكلمون الا من اذن له الرحمن وقال صوابا")
+        update = t.feed("جزاء من ربك عطاء حسبا يوم يقوم الروح والملائكة صفا لا يتكلمون الا من اذن له الرحمن وقال صوابا",
+                        final=True, continuous=True)
+        self.assertEqual(update["results"][2]["status"], "missed")
+        self.assertTrue(all(w["status"] == "missed" for w in update["results"][2]["words"]))
+
     def test_high_partial_does_not_advance_without_later_evidence(self):
         t = tracker("الحمد لله رب العالمين", "الرحمن الرحيم")
         self.assertEqual(t.feed("الحمد لله رب العالمون", final=True)["current"], 1)
