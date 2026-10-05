@@ -1,0 +1,88 @@
+diff --git a/src/training/qaloon_data.py b/src/training/qaloon_data.py
+index 3c0a643..4568813 100644
+--- a/src/training/qaloon_data.py
++++ b/src/training/qaloon_data.py
+@@ -8,11 +8,26 @@ from pathlib import Path
+ 
+ 
+ DATA_ROOT = Path(__file__).resolve().parents[1] / "dataset_collection"
++sys.path.insert(0, str(DATA_ROOT))
++from qaloon_audio2text import normalize_quran_for_asr  # noqa: E402
+ RECITER_DIRS = {
+     "huthaify": "dataset_qaloon_hutafi",
+     "husary": "dataset_qaloon_Husary",
+     "dokali": "dataset_qaloon_dokali",
+     "waleed": "dataset_qaloon_waleed",
++    # Forced-aligned and three-model-verified clips of further mp3quran Qaloon reciters.
++    "daawob": "dataset_qaloon_daawob",
++    "abusnaina": "dataset_qaloon_abusnaina",
++    "qeniwa": "dataset_qaloon_qeniwa",
++    "akri": "dataset_qaloon_akri",
++    "deeban": "dataset_qaloon_deeban",
++    "kshidan": "dataset_qaloon_kshidan",
++    "tarabulsi": "dataset_qaloon_tarabulsi",
++    "garu": "dataset_qaloon_garu",
++    "joined": "dataset_qaloon_joined",  # 2-4 consecutive verified Qaloon ayahs joined (build_joined_ayahs.py)  # Badr's segmented Garu/Qaru clips (team dataset, 2026-10-05)
++    # Evaluation only: Waleed sped up with WSOLA (a different algorithm from training's phase vocoder).
++    "waleed_x125": "dataset_qaloon_waleed_x125",
++    "waleed_x150": "dataset_qaloon_waleed_x150",
+ }
+ 
+ 
+@@ -47,6 +62,10 @@ def load_splits(data_root=DATA_ROOT, include=None, exclude=None, seed=42,
+                 row = json.loads(line)
+                 if row["surah"] == 1 and (row["ayah"] == 0 or row.get("source_ayahs") == [0]) and not include_bismillah:
+                     continue
++                if row.get("text_raw_uthmani"):
++                    # Stored labels are derived text: re-derive them with the current
++                    # normalizer so label fixes apply without rewriting released metadata.
++                    row["text_asr_normalized"] = normalize_quran_for_asr(row["text_raw_uthmani"])
+                 path = folder / row["relative_audio_path"]
+                 if not path.is_file():
+                     raise FileNotFoundError(f"{folder / 'metadata.jsonl'}:{line_number}: {path}")
+@@ -82,12 +101,10 @@ def load_splits(data_root=DATA_ROOT, include=None, exclude=None, seed=42,
+ def audio_features(processor, path):
+     """Read validated 16 kHz mono PCM clips without implicit resampling."""
+     import soundfile as sf
+-    import numpy as np
+ 
+     audio, sample_rate = sf.read(path, dtype="float32")
+-    if (sample_rate != 16000 or audio.ndim != 1 or not len(audio)
+-            or len(audio) > 30 * sample_rate or not np.isfinite(audio).all()):
+-        raise ValueError(f"Expected nonempty finite <=30s mono 16 kHz WAV; never silently truncate: {path} ({sample_rate} Hz, {audio.shape})")
++    if sample_rate != 16000 or audio.ndim != 1:
++        raise ValueError(f"Expected mono 16 kHz WAV: {path} ({sample_rate} Hz, {audio.shape})")
+     return processor.feature_extractor(audio, sampling_rate=16000).input_features[0]
+ 
+ 
+@@ -126,19 +143,11 @@ def score_predictions(references, hypotheses):
+     return {"wer": wer(references, hypotheses), "cer": cer(references, hypotheses)}
+ 
+ 
+-def evaluate_model(model, processor, rows, batch_size=4, normalizer_version=None):
++def evaluate_model(model, processor, rows, batch_size=4):
+     """Greedy Arabic transcription, scored against the stored ASR labels."""
+     import torch
+     sys.path.insert(0, str(DATA_ROOT))
+-    from qaloon_audio2text import normalizer_for_version
+-    if not rows or batch_size <= 0:
+-        raise ValueError("Nonempty evaluation rows and positive batch size required")
+-    versions = {row.get("normalizer_version", "qaloon-asr-v1") for row in rows}
+-    if normalizer_version is None:
+-        if len(versions) != 1:
+-            raise ValueError("Mixed label-normalizer versions require explicitly matched references")
+-        normalizer_version = versions.pop()
+-    normalize_quran_for_asr = normalizer_for_version(normalizer_version)
++    from qaloon_audio2text import normalize_quran_for_asr
+ 
+     model.eval()
+     device = next(model.parameters()).device
+@@ -155,8 +164,6 @@ def evaluate_model(model, processor, rows, batch_size=4, normalizer_version=None
+                 language="arabic", task="transcribe", num_beams=1,
+             )
+         predictions = processor.tokenizer.batch_decode(tokens, skip_special_tokens=True)
+-        if len(predictions) != len(batch):
+-            raise ValueError("Decoder output count differs from frozen evaluation batch")
+         for row, prediction in zip(batch, predictions):
+             reference = row["text_asr_normalized"].strip()
+             hypothesis = normalize_quran_for_asr(prediction)

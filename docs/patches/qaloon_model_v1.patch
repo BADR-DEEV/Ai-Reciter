@@ -1,0 +1,269 @@
+diff --git a/README.md b/README.md
+index 14d727c..d64acf7 100644
+--- a/README.md
++++ b/README.md
+@@ -219,4 +219,4 @@ Quran source: [MP3Quran](https://www.mp3quran.net/) page SVG and ayah-timing API
+ reference text: the existing project’s `QaloonData_v10(1).json`. Respect their usage
+ terms and attribution when publishing. Existing training instructions are in
+ `src/training_with_gpu/README.md`.
+-Numbering-alignment reference: [risan/quran-json](https://github.com/risan/quran-json).
++Numbering-alignment reference: KFGQPC Hafs v18 text ([mirror](https://github.com/thetruetruth/quran-data-kfgqpc)).
+diff --git a/src/dataset_collection/cache_quran_pages.py b/src/dataset_collection/cache_quran_pages.py
+index 6ffc147..55f6d08 100644
+--- a/src/dataset_collection/cache_quran_pages.py
++++ b/src/dataset_collection/cache_quran_pages.py
+@@ -81,10 +81,17 @@ def cache_page(url):
+     return filename, {"path": f"/quran/pages/{filename}", "viewBox": root.attrib["viewBox"]}
+ 
+ 
++HAFS_REFERENCE = "https://raw.githubusercontent.com/thetruetruth/quran-data-kfgqpc/main/hafs/data/hafsData_v18.json"
++
++
+ def load_hafs_reference():
++    """KFGQPC Hafs v18 text, used only to align Qaloon ayahs with the Hafs-numbered page artwork."""
+     path = PUBLIC / "hafs-reference.json"
+     if not path.exists():
+-        atomic_json(path, get("https://raw.githubusercontent.com/risan/quran-json/main/dist/quran.json").json())
++        surahs = {}
++        for row in get(HAFS_REFERENCE).json():
++            surahs.setdefault(int(row["sora"]), []).append({"id": int(row["aya_no"]), "text": row["aya_text"]})
++        atomic_json(path, [{"id": surah, "verses": verses} for surah, verses in sorted(surahs.items())])
+     return json.loads(path.read_text(encoding="utf-8"))
+ 
+ 
+diff --git a/src/dataset_collection/qaloon_audio2text.py b/src/dataset_collection/qaloon_audio2text.py
+index aa3bbec..35ef3c6 100644
+--- a/src/dataset_collection/qaloon_audio2text.py
++++ b/src/dataset_collection/qaloon_audio2text.py
+@@ -152,6 +152,12 @@ def normalize_quran_for_asr(text: str) -> str:
+     text = re.sub(r"[\u0660-\u0669\u06F0-\u06F9\d]", "", text)
+     text = fix_combining_hamza(text)
+     text = text.replace("ے", "ي").replace("ی", "ي").replace("ک", "ك")
++    # A ya carrying a fatha before a dagger alif is a consonant followed by a long
++    # a (القِيَٰمَة -> القيامة, ءَايَٰت -> ءايات); only an unvowelled ya is a seat for
++    # the alif (أَتَيٰكَ -> اتاك, below). At the start of a word it is the vocative
++    # particle, which the Uthmani script joins to its noun: يَٰٓأَيُّهَا -> يا ايها.
++    text = re.sub(r"(^|\s)([وف][\u064B-\u0652]*)?ي(\u0651?\u064E\u0651?)\u0670", r"\1\2ي\3ا ", text)
++    text = re.sub(r"ي(\u0651?\u064E\u0651?)\u0670", r"ي\1ا", text)
+     text = re.sub(r"[\u06D6-\u06ED\u06EE-\u06EF\u08F0-\u08F3]", "", text)
+     text = re.sub(r"[\u0610-\u061A\u064B-\u065F\u0674]", "", text)
+     text = text.replace("ـ", "")
+diff --git a/src/training/qaloon_data.py b/src/training/qaloon_data.py
+index 22f6eb3..ff13cdb 100644
+--- a/src/training/qaloon_data.py
++++ b/src/training/qaloon_data.py
+@@ -8,6 +8,8 @@ from pathlib import Path
+ 
+ 
+ DATA_ROOT = Path(__file__).resolve().parents[1] / "dataset_collection"
++sys.path.insert(0, str(DATA_ROOT))
++from qaloon_audio2text import normalize_quran_for_asr  # noqa: E402
+ RECITER_DIRS = {
+     "huthaify": "dataset_qaloon_hutafi",
+     "husary": "dataset_qaloon_Husary",
+@@ -47,6 +49,10 @@ def load_splits(data_root=DATA_ROOT, include=None, exclude=None, seed=42,
+                 row = json.loads(line)
+                 if row["surah"] == 1 and (row["ayah"] == 0 or row.get("source_ayahs") == [0]) and not include_bismillah:
+                     continue
++                if row.get("text_raw_uthmani"):
++                    # Stored labels are derived text: re-derive them with the current
++                    # normalizer so label fixes apply without rewriting released metadata.
++                    row["text_asr_normalized"] = normalize_quran_for_asr(row["text_raw_uthmani"])
+                 path = folder / row["relative_audio_path"]
+                 if not path.is_file():
+                     raise FileNotFoundError(f"{folder / 'metadata.jsonl'}:{line_number}: {path}")
+diff --git a/src/training_with_gpu/train_base_full.py b/src/training_with_gpu/train_base_full.py
+index e7297ba..e752b7a 100644
+--- a/src/training_with_gpu/train_base_full.py
++++ b/src/training_with_gpu/train_base_full.py
+@@ -31,6 +31,19 @@ def parse_args():
+     p.add_argument("--seed", type=int, default=42)
+     p.add_argument("--validation-reciter", choices=RECITER_DIRS)
+     p.add_argument("--test-reciter", choices=RECITER_DIRS)
++    p.add_argument("--base-model", default="openai/whisper-base",
++                   help="Checkpoint to start from, e.g. a Quran-pretrained Whisper of any size")
++    p.add_argument("--include-reciter", nargs="+", choices=RECITER_DIRS,
++                   help="Only these reciters (default: all reciter folders)")
++    p.add_argument("--exclude-clips", type=Path,
++                   help="audit_labels.py output; its flagged clips are left out of training only")
++    p.add_argument("--freeze-encoder", action="store_true", help="Train the decoder only")
++    p.add_argument("--mask-time-prob", type=float, default=0.0, help="SpecAugment time masking (0 disables)")
++    p.add_argument("--select-by", choices=("loss", "wer"), default="loss",
++                   help="Checkpoint selection: validation loss, or generated validation WER")
++    p.add_argument("--train-on-all", action="store_true",
++                   help="Release model: train on every split for a fixed --epochs, with no selection or "
++                        "self-evaluation; evaluate it afterwards on reciters left out with --include-reciter")
+     p.add_argument("--dry-run", action="store_true", help="Validate splits without loading a model or training")
+     return p.parse_args()
+ 
+@@ -90,13 +103,41 @@ class AugmentedAyahDataset:
+         }
+ 
+ 
++def validation_wer(processor):
++    """Generated-text WER with the project's normalizer, for checkpoint selection."""
++    import jiwer
++    sys.path.insert(0, str(TRAINING_DIR.parent / "dataset_collection"))
++    from qaloon_audio2text import normalize_quran_for_asr
++
++    def decode(ids):
++        # The trainer pads predictions and labels with -100 across batches.
++        return processor.batch_decode(np.where(ids != -100, ids, processor.tokenizer.pad_token_id),
++                                      skip_special_tokens=True)
++
++    def compute(prediction):
++        references = [normalize_quran_for_asr(text) for text in decode(prediction.label_ids)]
++        hypotheses = [normalize_quran_for_asr(text) for text in decode(prediction.predictions)]
++        return {"wer": jiwer.wer(references, hypotheses)}
++    return compute
++
++
+ def main():
+     args = parse_args()
+-    splits, skipped = load_splits(args.data_root, None, None, args.seed)
++    splits, skipped = load_splits(args.data_root, args.include_reciter, None, args.seed)
+     if bool(args.validation_reciter) != bool(args.test_reciter):
+         raise ValueError("Pass both --validation-reciter and --test-reciter for speaker-disjoint training")
+     if args.test_reciter:
+         splits = speaker_disjoint_splits(splits, args.validation_reciter, args.test_reciter)
++    if args.train_on_all:
++        splits = {"train": [row for part in splits.values() for row in part], "validation": [], "test": []}
++    excluded = []
++    if args.exclude_clips:
++        flagged = {item["key"] for item in json.loads(args.exclude_clips.read_text(encoding="utf-8"))["flagged"]}
++        key = lambda row: f"{row['reciter_key']}:{row['surah']}:{row['ayah']}"
++        excluded = sorted(key(row) for row in splits["train"] if key(row) in flagged)
++        splits["train"] = [row for row in splits["train"] if key(row) not in flagged]
++        print(f"Excluded {len(excluded)} flagged clips from training")
++    evaluate = not args.train_on_all
+     counts = {k: len(v) for k, v in splits.items()}
+     print("Split counts:", counts, "Excluded >30s:", skipped)
+     print("Reciters:", {k: sorted({row["reciter_key"] for row in rows}) for k, rows in splits.items()})
+@@ -114,19 +155,31 @@ def main():
+         raise RuntimeError("CUDA GPU required.")
+     print("GPU:", torch.cuda.get_device_name(0), "VRAM:", round(torch.cuda.get_device_properties(0).total_memory / 1e9, 2), "GB")
+ 
+-    model_id = "openai/whisper-base"
++    model_id = args.base_model
+     processor = WhisperProcessor.from_pretrained(model_id, language="arabic", task="transcribe")
+     processor.tokenizer.set_prefix_tokens(language="arabic", task="transcribe")
+ 
+     # FULL FINE-TUNING: Load entire model without PEFT/LoRA
+     model = WhisperForConditionalGeneration.from_pretrained(model_id)
++    if not hasattr(model.generation_config, "lang_to_id"):
++        # Some community checkpoints were saved without the multilingual generation config.
++        from transformers import GenerationConfig
++        from benchmark_models import OPENAI_BASES
++        c = model.config
++        model.generation_config = GenerationConfig.from_pretrained(OPENAI_BASES[(c.d_model, c.encoder_layers, c.decoder_layers)])
+     model.config.use_cache = False
+     model.generation_config.language = "arabic"
+     model.generation_config.task = "transcribe"
++    if args.mask_time_prob:
++        model.config.apply_spec_augment = True
++        model.config.mask_time_prob = args.mask_time_prob
++    if args.freeze_encoder:
++        model.model.encoder.requires_grad_(False)
+     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+ 
+     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+-    print(f"🔥 Training FULL MODEL: {trainable_params:,} parameters (100% of Whisper-Base)!")
++    total_params = sum(p.numel() for p in model.parameters())
++    print(f"Training {trainable_params:,} of {total_params:,} parameters from {model_id}")
+ 
+     weights = [args.dokali_weight if row["reciter_key"] == "dokali" else 1.0 for row in splits["train"]]
+ 
+@@ -146,15 +199,16 @@ def main():
+         weight_decay=0.01,
+         bf16=torch.cuda.is_bf16_supported(),
+         fp16=not torch.cuda.is_bf16_supported(),
+-        eval_strategy="epoch",
++        eval_strategy="epoch" if evaluate else "no",
+         save_strategy="epoch",
+         save_total_limit=2,
+-        load_best_model_at_end=True,
+-        metric_for_best_model="eval_loss",
++        load_best_model_at_end=evaluate,
++        metric_for_best_model="eval_wer" if args.select_by == "wer" else "eval_loss",
+         greater_is_better=False,
+         remove_unused_columns=False,
+         label_names=["labels"],
+-        predict_with_generate=False,
++        predict_with_generate=args.select_by == "wer",
++        generation_max_length=225,
+         logging_steps=25,
+         max_grad_norm=1.0,
+         dataloader_num_workers=0,
+@@ -166,11 +220,14 @@ def main():
+         model=model,
+         args=training_args,
+         train_dataset=AugmentedAyahDataset(splits["train"], processor, args.label_field, args.noise_prob, args.speed_prob),
+-        eval_dataset=AugmentedAyahDataset(splits["validation"], processor, args.label_field),
++        eval_dataset=AugmentedAyahDataset(splits["validation"], processor, args.label_field) if evaluate else None,
+         data_collator=WhisperCollator(processor, model.config.decoder_start_token_id),
+-        callbacks=[EarlyStoppingCallback(early_stopping_patience=args.patience)],
++        callbacks=[EarlyStoppingCallback(early_stopping_patience=args.patience)] if evaluate else [],
++        compute_metrics=validation_wer(processor) if evaluate and args.select_by == "wer" else None,
+     )
+ 
++    if evaluate and args.select_by == "wer":
++        print("Validation before training:", trainer.evaluate())
+     trainer.train()
+ 
+     args.output_dir.mkdir(parents=True, exist_ok=True)
+@@ -181,13 +238,16 @@ def main():
+ 
+     # Test evaluation
+     from gpu_evaluation import evaluate_rows
+-    result = {"model": model_id, "best_eval_loss": trainer.state.best_metric, "seed": args.seed,
++    result = {"model": model_id, "selected_by": args.select_by, "best_eval_metric": trainer.state.best_metric,
++              "seed": args.seed, "freeze_encoder": args.freeze_encoder, "mask_time_prob": args.mask_time_prob,
++              "learning_rate": args.learning_rate, "excluded_training_clips": excluded,
+               "label_field": args.label_field, "split_counts": counts,
+               "split_protocol": "speaker-disjoint" if args.test_reciter else "known-voice-unseen-ayah",
+               "validation_reciter": args.validation_reciter, "test_reciter": args.test_reciter,
+               "split_reciters": {k: sorted({r["reciter_key"] for r in rows}) for k, rows in splits.items()},
+-              "augmentation": {"noise_prob": args.noise_prob, "speed_prob": args.speed_prob, "max_seconds": 30}}
+-    for split in ("validation", "test"):
++              "augmentation": {"noise_prob": args.noise_prob, "speed_prob": args.speed_prob, "max_seconds": 30},
++              "trained_on_all_splits": args.train_on_all, "epochs": args.epochs}
++    for split in ("validation", "test") if evaluate else ():
+         scores, details = evaluate_rows(model, processor, splits[split], args.eval_batch_size, args.label_field)
+         result[split] = scores
+         print(f"\n{split.upper()} RESULTS:", json.dumps(scores, ensure_ascii=False, indent=2))
+diff --git a/web/package-lock.json b/web/package-lock.json
+index 5b03e24..3ee0b42 100644
+--- a/web/package-lock.json
++++ b/web/package-lock.json
+@@ -672,6 +672,7 @@
+       "integrity": "sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==",
+       "devOptional": true,
+       "license": "Apache-2.0",
++      "peer": true,
+       "dependencies": {
+         "playwright": "1.63.0"
+       },
+@@ -707,6 +708,7 @@
+       "integrity": "sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==",
+       "dev": true,
+       "license": "MIT",
++      "peer": true,
+       "dependencies": {
+         "csstype": "^3.2.2"
+       }
+@@ -911,6 +913,7 @@
+       "resolved": "https://registry.npmjs.org/react/-/react-19.3.0.tgz",
+       "integrity": "sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==",
+       "license": "MIT",
++      "peer": true,
+       "engines": {
+         "node": ">=0.10.0"
+       }
+@@ -920,6 +923,7 @@
+       "resolved": "https://registry.npmjs.org/react-dom/-/react-dom-19.3.0.tgz",
+       "integrity": "sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q==",
+       "license": "MIT",
++      "peer": true,
+       "dependencies": {
+         "scheduler": "^0.28.0"
+       },
