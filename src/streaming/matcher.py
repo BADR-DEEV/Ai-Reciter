@@ -48,6 +48,23 @@ def alignment(expected, heard):
     return pairs
 
 
+OPENING_PHRASES = ("اعوذ بالله من الشيطان الرجيم", "بسم الله الرحمن الرحيم")
+
+
+def opening_length(heard):
+    """Number of leading words that are a recited isti'adha and/or basmalah.
+
+    Each phrase must start where the previous one ended (its first word may be
+    misheard) and match all but at most one of its words, in order.
+    """
+    position = 0
+    for phrase in map(words, OPENING_PHRASES):
+        pairs = alignment(phrase, heard[position:position + len(phrase)])
+        if len(pairs) >= len(phrase) - 1 and pairs[0][1] <= 1:
+            position += len(phrase)
+    return position
+
+
 class RecitationTracker:
     def __init__(self, ayahs, threshold=0.65, surah=None, context_limit=80):
         # Cached normalized fields may predate the v2 bug fix. Derive matching
@@ -132,12 +149,14 @@ class RecitationTracker:
             return self.snapshot(transcript)
         heard = words(transcript)
         tags = list(tags) if tags is not None and len(tags) == len(heard) else None
-        if self.surah == 1 and self.index == 0:
-            intro = words("بسم الله الرحمن الرحيم")
-            if heard[:len(intro)] == intro:
-                heard = heard[len(intro):]
-                tags = tags and tags[len(intro):]
-                stable_prefix = max(0, stable_prefix - len(intro))
+        if not self.has_advanced:
+            # Readers open with the isti'adha and/or basmalah; neither is an ayah here.
+            # Left in, the basmalah's الرحمن الرحيم was taken for al-Fatiha 1:2 (or its
+            # الله for 112:1), so the real first ayah was marked missed.
+            opening = opening_length(heard)
+            heard = heard[opening:]
+            tags = tags and tags[opening:]
+            stable_prefix = max(0, stable_prefix - opening)
         original = heard[:]
         consumed = 0
         if continuous and self.completed_context:
