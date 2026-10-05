@@ -73,6 +73,8 @@ async function models(): Promise<ModelEntry[]> {
     await fullModel("rattil-v3", path.join(ROOT, "runs/rattil_qaloon_v3"), "Full fine-tune · recommended",
       "Hugging Face Mathani-Ayat/rattil-qaloon-v3@e9e59ac (src/deployment/pull_hf_assets.py)",
       "Waleed (held-out voice): 2.2% WER normal speed · 13.4% at 1.25× · 21.2% at 1.5× (model card)"),
+    await fullModel("rattil-tajweed-v1", path.join(ROOT, "runs/rattil_qaloon_tajweed_v1"), "Tajweed-tagged full fine-tune · ahkam check",
+      "Trained locally: python -m src.tajweed.targets, then train_base_full.py (docs/QALOON_TAJWEED.md)"),
     await fullModel("gpu-full-base", path.join(ROOT, "runs/gpu_base_full"), "Full fine-tune · original team model",
       release ? `Hugging Face ${release.repo_id}@${release.commit.slice(0, 7)} (src/deployment/restore_local_full.py)` : "Hugging Face release"),
     {

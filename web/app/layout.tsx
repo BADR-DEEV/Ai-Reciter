@@ -3,6 +3,7 @@ import "./globals.css";
 import "./learn.css";
 import "./challenges.css";
 import "./reader.css";
+import "./tajweed.css";
 import { LanguageProvider } from "@/lib/i18n";
 
 export const metadata: Metadata = {

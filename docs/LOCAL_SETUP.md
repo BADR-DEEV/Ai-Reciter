@@ -63,15 +63,22 @@ shows that button. Set `RATTIL_PYTHON` if `python3` isn't the Python with
 ## Run
 
 ```bash
-# Terminal 1: inference API on :8000 (one model per process; restart to switch)
+# Terminal 1: inference API on :8000 (plain model + tajweed model side by side)
 python -m src.streaming.serve --model rattil-v3
+#   also offers tajweed=rattil-tajweed-v1 (runs/rattil_qaloon_tajweed_v1); it loads on first
+#   use once that folder exists, and requests fall back to plain until then.
+#   explicit: --models plain=rattil-v3,tajweed=runs/rattil_qaloon_tajweed_v1
 #   other presets: gpu-full-base (old team model), deepdml (adapter, training PC only)
 
 # Terminal 2: web on :3000 (the API only accepts origins on port 3000)
 cd web && npm install && npx next dev --hostname 127.0.0.1 -p 3000
 ```
 
-Pages: `/` course, `/learn`, `/studio`, `/games`, `/profile`, and `/dev` (dev mode only).
+Pages: `/` course, `/learn`, `/studio`, `/tajweed` (letter sounds, rules, Qālūn topics),
+`/games`, `/profile`, and `/dev` (dev mode only).
+
+Tajweed colors need `web/public/quran/tajweed/`. The first start builds it; to rebuild after
+changing rules run `python -m src.tajweed.build` (about 7 s). See `docs/QALOON_TAJWEED.md`.
 
 ### Mac notes
 
@@ -101,6 +108,8 @@ what reads it and where it comes from. Restart `next dev` after changing the fla
 
 ## Limits
 
-These models recognise recited words; they do not judge tajweed. They were tested on
+The plain models recognise recited words; they do not judge tajweed. The tajweed model
+(`docs/QALOON_TAJWEED.md`) adds tags for audible rules, but it is an early model trained only
+on correct recitations. They were tested on
 professional reciters, not learners. Source recordings' licenses are not
 established, so keep the models and datasets private.

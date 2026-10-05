@@ -26,18 +26,50 @@ html[dir="rtl"] .studio-shell .view-switch button{font-size:14px}
 .ayah-reading-line .quran-word{font-weight:400;letter-spacing:normal}
 /* Color changes must not change the font run: synthetic bold and inline boxes
    split Arabic shaping/ligatures at the colored letter. Never insert ZWJ text. */
-.tajweed-span{display:inline;font-family:inherit;font-size:inherit;font-weight:inherit;font-style:inherit;line-height:inherit;letter-spacing:inherit;padding:0;margin:0;border:0;unicode-bidi:normal}
+.tajweed-span{display:inline;font-family:inherit;font-size:inherit;font-weight:inherit;font-style:inherit;line-height:inherit;letter-spacing:inherit;padding:0;margin:0;border:0;unicode-bidi:normal;cursor:help}
+.tj-madd_necessary{color:var(--tj-madd_necessary)}.tj-madd_connected{color:var(--tj-madd_connected)}.tj-madd_permitted{color:var(--tj-madd_permitted)}.tj-madd_natural{color:var(--tj-madd_natural)}
+.tj-nasal{color:var(--tj-nasal)}.tj-merge{color:var(--tj-merge)}.tj-qalqala{color:var(--tj-qalqala)}.tj-heavy{color:var(--tj-heavy)}.tj-light{color:var(--tj-light)}.tj-clear{color:var(--tj-clear)}
+/* Qālūn riwāyah points: colour plus a dotted underline, so the cue is not colour alone. */
+.tj-riwaya{color:var(--tj-riwaya);text-decoration:underline dotted;text-decoration-thickness:1.5px;text-underline-offset:9px}
+.tj-miss{text-decoration:underline wavy #c0392b;text-decoration-thickness:1.5px;text-underline-offset:9px}
+.tajweed-model-note{color:var(--muted);font-size:11px}
 .tajweed-legend{padding:16px;border:1px solid var(--line);background:var(--paper);border-radius:12px;margin-bottom:16px;line-height:1.8}
 .tajweed-legend summary{cursor:pointer;font-weight:600;color:var(--green)}
 .tajweed-legend h3{margin:0 0 8px;font-size:15px;color:var(--green)}
 .mushaf-card>.tajweed-legend{margin:0;border:0;border-top:1px solid var(--line);border-radius:0;padding:16px 22px}
-.tajweed-legend .tajweed-palette{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 20px;margin:0}
-.tajweed-legend .tajweed-palette li{font-size:13px;line-height:1.7}
+.tajweed-legend .tajweed-palette{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 14px;margin:0;padding:6px 0 10px;list-style:none}
+.tajweed-legend .tajweed-palette li{font-size:13px;line-height:1.5}
+.tajweed-palette button{display:flex;align-items:center;gap:8px;width:100%;text-align:start;padding:5px 8px;border-radius:8px;border:1px solid transparent;color:var(--ink)}
+.tajweed-palette button:hover{background:#f3f6ef}
+.tajweed-palette button.off{opacity:.45;text-decoration:line-through}
+.tajweed-details-switch{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--ink);margin:2px 0 8px}
 .tajweed-legend details{margin-block:10px}
-.tajweed-legend small{font-size:11px;color:var(--muted)}
-.tajweed-legend ul{display:flex;flex-wrap:wrap;gap:10px 22px;padding:12px 0;list-style:none}
-.tajweed-legend li{display:flex;align-items:center;gap:8px}
-.tajweed-legend i{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.tajweed-legend small{display:block;font-size:11px;color:var(--muted);line-height:1.7}
+.tajweed-legend small a{color:var(--green);text-decoration:underline}
+.tajweed-legend i{width:12px;height:12px;border-radius:3px;flex-shrink:0;display:inline-block}
+.tajweed-rule-group h4{display:flex;align-items:center;gap:8px;font-size:13px;margin:14px 0 4px;color:var(--ink)}
+.tajweed-rule-notes{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.tajweed-rule-notes li{font-size:12px;line-height:1.6;display:flex;flex-wrap:wrap;gap:4px 8px}
+.tajweed-rule-notes li span:last-child{color:#5f6b62;flex-basis:100%}
+.tajweed-count{font-size:11px;color:var(--green);background:var(--mint);border-radius:4px;padding:0 6px}
+.tajweed-inspector{position:fixed;z-index:60;width:min(340px,calc(100vw - 24px));transform:translate(-50%,-100%);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px #1a3a2a26;padding:12px 14px;font:13px/1.6 'DM Sans',sans-serif;color:var(--ink);text-align:start}
+.tajweed-inspector.below{transform:translate(-50%,0)}
+.tajweed-inspector-head{display:flex;align-items:center;justify-content:space-between;font:26px/1.6 'Amiri',serif;border-bottom:1px solid var(--line);margin-bottom:6px}
+.tajweed-inspector section+section{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px}
+.tajweed-inspector h4{display:flex;align-items:center;gap:8px;font-size:14px;margin:0}
+.tajweed-inspector h4 i{width:10px;height:10px;border-radius:3px}
+.tajweed-inspector h4 small{margin-inline-start:auto;font-size:11px;color:var(--green);background:var(--mint);border-radius:4px;padding:0 6px}
+.tajweed-inspector p{margin:4px 0}
+.tajweed-inspector .tajweed-note{background:#faf6ff;border-inline-start:3px solid var(--tj-riwaya,#7a1fbf);padding:4px 8px;border-radius:4px}
+.tajweed-inspector .tajweed-wajh{font-size:12px;color:#5a4a00}
+.tajweed-inspector footer{font-size:11px;color:var(--muted)}
+.tajweed-inspector footer a{color:var(--green);text-decoration:underline}
+.tajweed-feedback-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 19px;font-size:12px}
+.tajweed-feedback-card ul{list-style:none;padding:0;margin:10px 0 0;display:flex;flex-direction:column;gap:6px}
+.tajweed-feedback-card li{display:flex;justify-content:space-between;gap:8px}
+.tajweed-feedback-card li strong{color:#c0392b}
+.tajweed-feedback-card p{margin-top:8px;line-height:1.6;color:#5f6b62}
+.tajweed-feedback-hint{font-size:11px}
 html[dir="rtl"] .studio-shell h1{font-family:'Amiri',serif;letter-spacing:0}
 html[dir="rtl"] .studio-shell .eyebrow{letter-spacing:0}
 .course-language-note{font-size:14px;line-height:1.8;padding:12px 16px;margin-block:16px;background:var(--gold-wash);border-radius:10px}

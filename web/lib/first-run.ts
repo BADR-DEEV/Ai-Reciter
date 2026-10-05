@@ -27,8 +27,8 @@ function run(label: string, args: string[]) {
 export async function firstRunSetup() {
   const manifest = path.join(QURAN, "manifest.json");
   if (!await exists(manifest)) await run("First run: caching Quran pages and text (~350 MB)", ["src/dataset_collection/cache_quran_pages.py", "--skip-metadata"]);
-  if (await exists(manifest) && !await exists(path.join(QURAN, "qalon_majwad_mushaf.json")))
-    await run("First run: generating the tajweed draft", ["src/learning/build_qalon_tajweed.py"]);
+  if (await exists(manifest) && !await exists(path.join(QURAN, "tajweed/rules.json")))
+    await run("First run: generating Qālūn tajweed colors", ["-m", "src.tajweed.build"]);
 
   const audio = await startReaderAudioDownload();
   if (audio.state !== "ready") {

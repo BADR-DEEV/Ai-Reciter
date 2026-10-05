@@ -46,18 +46,10 @@ dataset metadata were not modified.
 
 ## Concrete aḥkām corrections
 
-`build_qalon_tajweed.py` v0.3 adds explicit mīm-sākin ikhfa/idgham candidates
-**conditional on the sukun realization**, not a universal mīm-al-jam choice.
-It distinguishes pause-induced **lin** and **ʿiwaḍ** from ordinary natural madd,
-and avoids qalqalah on a fatḥatayn ending realized with replacement alif.
-It recognizes the Maghrebi source placing fathatayn **on the spelling alif** as
-well as the alternative placement on the preceding consonant. Original text and
-UTF-16 display offsets remain untouched.
-
-The regenerated whole-Quran draft has **6,210 ayahs / 111,617 candidate spans**,
-**zero approvals**. Route-dependent Qālūn sukun/silah, hamza and connected-reading
-choices remain unselected and require qualified review. The inaccessible Scribd
-reference was not secretly consulted; upload its PDF for exact-source checking.
+Superseded: `build_qalon_tajweed.py` now delegates to the rule engine in `src/tajweed`
+(see [`QALOON_TAJWEED.md`](QALOON_TAJWEED.md)), which works on the full Qālūn text and fixes the
+v0.3 draft's mīm-sākin rules that never fired, the madd-lāzim false positives on كَفَرُواْ and
+the lost iqlāb after tanwīn.
 
 ## Pinned Tarteel Quran-base for segmentation
 
