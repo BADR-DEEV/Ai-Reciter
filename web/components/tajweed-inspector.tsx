@@ -23,7 +23,7 @@ export function TajweedInspector({ container, rules, ayahs, basmala }: {
   const card = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const root = container.current;
-    if (!root || !rules) return;
+    if (!root || !rules) { setOpen(null); return; }
     const onClick = (event: MouseEvent) => {
       const span = (event.target as HTMLElement).closest<HTMLElement>(".tajweed-span[data-tj]");
       if (!span) return;
