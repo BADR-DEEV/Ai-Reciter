@@ -9,7 +9,7 @@ const verses: Verse[] = [
 ];
 for (const mode of ["next", "audio", "surah", "missing", "order"] as ChallengeMode[]) {
   test(`${mode} questions have exactly one answer and distinct choices`, () => {
-    const q = makeChallenge(verses, mode, "hard", null, () => 0.25);
+    const q = makeChallenge(verses, mode, "hard", { random: () => 0.25 });
     expect(q.options).toHaveLength(3);
     expect(new Set(q.options.map(o => o.audio || o.label)).size).toBe(3);
     expect(q.answer).toBeGreaterThanOrEqual(0);
@@ -97,11 +97,11 @@ test("text embeddings rank the closest ayahs as hard choices and keep easy ones 
   const index = fakeIndex(vectors);
   const pool = [{ surah: 9, name: "Prompt", ayah: 1, text: "start", normalized: "start" }, { surah: 9, name: "Prompt", ayah: 2, text: "ayah 0", normalized: "ayah 0x" }, ...ring.slice(1)];
   index.ayahs.index.set("9:2", 0);
-  const hard = makeChallenge(pool, "next", "hard", null, () => 0, "en", index);
+  const hard = makeChallenge(pool, "next", "hard", { random: () => 0, text: index });
   const hardIDs = hard.options.filter((_, i) => i !== hard.answer).map(o => ring.findIndex(v => v.text === o.label));
   expect(Math.max(...hardIDs)).toBeLessThanOrEqual(6);
   expect(hard.similarity).toContain("embeddings");
-  const surahs = makeChallenge(ring, "surah", "hard", null, () => 0, "en", index);
+  const surahs = makeChallenge(ring, "surah", "hard", { random: () => 0, text: index });
   const picked = ring.findIndex(v => v.name === surahs.options[surahs.answer].label);
   for (const option of surahs.options) expect(Math.abs(ring.findIndex(v => v.name === option.label) - picked)).toBeLessThanOrEqual(4);
 });
@@ -130,13 +130,87 @@ test("missing-word choices never differ from the answer only by vowels or Qālū
 });
 
 test("ayah order distractors get closer with difficulty and carry each ayah separately", () => {
-  const hard = makeChallenge(verses, "order", "hard", null, () => 0.25);
+  const hard = makeChallenge(verses, "order", "hard", { random: () => 0.25 });
   const right = hard.options[hard.answer].parts!;
   expect(right).toEqual(["word one alpha", "word two beta", "word three gamma"]);
   for (const option of hard.options) {
     expect(option.parts).toHaveLength(3);
     expect(option.parts!.filter((part, i) => part === right[i]).length).toBeGreaterThanOrEqual(1);
   }
-  const easy = makeChallenge(verses, "order", "easy", null, () => 0.25);
+  const easy = makeChallenge(verses, "order", "easy", { random: () => 0.25 });
   expect(easy.options.filter((_, i) => i !== easy.answer).every(o => o.parts![0] !== right[0])).toBe(true);
+});
+
+const surahOf = (surah: number, name: string, texts: string[]): Verse[] => texts.map((text, i) => ({ surah, name, ayah: i + 1, text, normalized: text }));
+const takathur = surahOf(102, "At-Takāthur", ["الهاكم التكاثر", "حتى زرتم المقابر", "كلا سوف تعلمون", "ثم كلا سوف تعلمون", "كلا لو تعلمون علم اليقين", "لترون الجحيم", "ثم لترونها عين اليقين", "ثم لتسألن يومئذ عن النعيم"]);
+const kafirun = surahOf(109, "Al-Kāfirūn", ["قل يا ايها الكافرون", "لا اعبد ما تعبدون", "ولا انتم عابدون ما اعبد", "ولا انا عابد ما عبدتم", "ولا انتم عابدون ما اعبد", "لكم دينكم ولي دين"]);
+const others = surahOf(103, "Al-‘Aṣr", ["والعصر", "ان الانسان لفي خسر", "الا الذين امنوا وعملوا الصالحات وتواصوا بالحق وتواصوا بالصبر"])
+  .concat(surahOf(108, "Al-Kawthar", ["انا اعطيناك الكوثر", "فصل لربك وانحر", "ان شانئك هو الابتر"]));
+const corpus = [...takathur, ...kafirun, ...others];
+const surahFor = (label: string) => corpus.find(v => v.text === label)!.surah;
+
+test("next-ayah choices never repeat the ayah on screen, a near copy of it, or the successor of its twin", () => {
+  for (let i = 0; i < 300; i++) for (const from of ["surah", "scope", "quran"] as const) {
+    const q = makeChallenge(corpus, "next", (["easy", "medium", "hard"] as const)[i % 3], { from });
+    const wrong = q.options.filter((_, k) => k !== q.answer).map(o => o.label);
+    expect(wrong).not.toContain(q.prompt);
+    if (q.prompt === "ثم كلا سوف تعلمون") expect(wrong).not.toContain("كلا سوف تعلمون");
+    // Both copies of the refrain are followed by a right answer; neither may be marked wrong.
+    if (q.prompt === "ولا انتم عابدون ما اعبد") expect(wrong.filter(w => w === "ولا انا عابد ما عبدتم" || w === "لكم دينكم ولي دين")).toEqual([]);
+  }
+});
+
+test("restore-the-word never offers a word that is already visible in the ayah", () => {
+  for (let i = 0; i < 300; i++) {
+    const q = makeChallenge(corpus, "missing", (["easy", "medium", "hard"] as const)[i % 3], { from: (["surah", "scope", "quran"] as const)[i % 3] });
+    const visible = q.prompt.split(/\s+/).map(wordKey);
+    q.options.forEach((o, k) => { if (k !== q.answer) expect(visible).not.toContain(wordKey(o.label)); });
+  }
+});
+
+test("choices can come from the same surah, the reading scope or the whole Quran", () => {
+  const scope = [...takathur, ...kafirun];
+  let outside = 0;
+  for (let i = 0; i < 200; i++) {
+    const same = makeChallenge(scope, "next", "medium", { from: "surah", quran: corpus });
+    if (!same.similarity.includes("too few")) for (const o of same.options) expect(surahFor(o.label)).toBe(same.surah);
+    for (const o of makeChallenge(scope, "next", "medium", { from: "scope", quran: corpus }).options) expect([102, 109]).toContain(surahFor(o.label));
+    const whole = makeChallenge(scope, "next", "easy", { from: "quran", quran: corpus });
+    outside += whole.options.filter(o => ![102, 109].includes(surahFor(o.label))).length;
+  }
+  expect(outside).toBeGreaterThan(0);
+});
+
+test("a surah too short for two same-surah choices is topped up from the reading scope and says so", () => {
+  const scope = [...surahOf(108, "Al-Kawthar", ["انا اعطيناك الكوثر", "فصل لربك وانحر", "ان شانئك هو الابتر"]), ...takathur];
+  let short = 0;
+  for (let i = 0; i < 80; i++) {
+    const q = makeChallenge(scope, "next", "hard", { from: "surah" });
+    if (q.surah !== 108) continue;
+    short++;
+    expect(q.similarity).toContain("too few here");
+    expect(q.options).toHaveLength(3);
+  }
+  expect(short).toBeGreaterThan(0);
+});
+
+test("a refrain repeated many times cannot crowd out the choices", () => {
+  const rahman = surahOf(55, "Ar-Raḥmān", Array.from({ length: 40 }, (_, i) => i % 2 ? "فباي الاء ربكما تكذبان" : `اية فريدة رقم ${i}`));
+  for (let i = 0; i < 200; i++) expect(() => makeChallenge([...rahman, ...others], "next", "hard", { from: "scope" })).not.toThrow();
+});
+
+test("the choices-from setting reaches the API and only lists sources that apply", async ({ page }) => {
+  const seen: string[] = [];
+  await page.route("**/api/challenges?**", route => { seen.push(route.request().url()); return route.continue(); });
+  await page.goto("/games");
+  const from = page.getByLabel("Where wrong answers come from");
+  await expect(from).toHaveValue("scope");
+  await from.selectOption("surah");
+  await expect.poll(() => seen.some(url => url.includes("mode=next") && url.includes("from=surah"))).toBe(true);
+  await page.getByRole("button", { name: /Find the surah/ }).click();
+  await expect(from.locator("option[value=surah]")).toHaveCount(0);
+  await expect(from).toHaveValue("scope");
+  await expect.poll(() => seen.some(url => url.includes("mode=surah") && url.includes("from=scope"))).toBe(true);
+  await page.getByRole("button", { name: /Ayah sequence/ }).click();
+  await expect(from).toHaveCount(0);
 });

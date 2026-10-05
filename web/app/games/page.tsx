@@ -9,7 +9,7 @@ import { SayPanel } from "@/components/learn/say-panel";
 import { modelOnline } from "@/lib/learn/api";
 import { playUrl, stopAudio } from "@/lib/learn/speech";
 import { useProgress } from "@/lib/learn/progress";
-import type { Challenge, ChallengeMode, ChallengeOption, Difficulty } from "@/lib/challenges";
+import type { Challenge, ChallengeMode, ChallengeOption, ChoiceSource, Difficulty } from "@/lib/challenges";
 import { useLang } from "@/lib/i18n";
 import { useReferenceReciter } from "@/lib/use-reference-reciter";
 import { ReciterSelector } from "@/components/reciter-selector";
@@ -42,6 +42,8 @@ export default function GamesPage() {
   const notes: Record<ChallengeMode, string> = { next: "تذكّر الآية التالية. اتلُها لملاحظات نصية أو استخدم الخيارات.", audio: "آية واحدة وثلاثة تسجيلات بقالون. اختر المطابق.", surah: "حدّد سورة الآية. نستبعد الآيات المكررة التي تحتمل أكثر من سورة.", missing: "أكمل كلمة ناقصة. لا يتغير نص المصدر.", order: "اختر الترتيب الصحيح لثلاث آيات متتابعة." };
   const [mode, setMode] = useState<ChallengeMode>("next"), [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [scope, setScope] = useState("amma"), [round, setRound] = useState(0);
+  // Same surah does not apply to "Find the surah"; the order game has no outside choices at all.
+  const [from, setFrom] = useState<ChoiceSource>("scope"), source: ChoiceSource = mode === "surah" && from === "surah" ? "scope" : from;
   const [question, setQuestion] = useState<Challenge | null>(null), [picked, setPicked] = useState<number | null>(null);
   const [revealed, setRevealed] = useState(false), [choices, setChoices] = useState(false);
   // Latin reading is on by default in English so non-Arabic readers can take part; Arabic readers opt in.
@@ -57,7 +59,8 @@ export default function GamesPage() {
     window.addEventListener(PROFILE_EVENT, changed);
     return () => window.removeEventListener(PROFILE_EVENT, changed);
   }, []);
-  const skillID = `${mode}:${scope}:${mode === "audio" ? reciter : "text"}`;
+  // Choice sources change how hard a level is, so each keeps its own history; the default keeps the original key.
+  const skillID = `${mode}:${scope}:${mode === "audio" ? reciter : "text"}${mode !== "order" && source !== "scope" ? `:${source}` : ""}`;
   useEffect(() => {
     const refresh = () => {
       try { const saved = JSON.parse(localStorage.getItem(`${progressKey()}:adaptive-v1:${skillID}`) || "null");
@@ -75,11 +78,11 @@ export default function GamesPage() {
     const c = new AbortController();
     answered.current = "";
     stopAudio(); setPlaying(null); setQuestion(null); setPicked(null); setRevealed(false); setOutcome("review"); setChoices(mode !== "next"); setError("");
-    fetch(`/api/challenges?mode=${mode}&difficulty=${difficulty}&scope=${scope}&reciter=${reciter}&lang=${lang}`, { signal: c.signal })
+    fetch(`/api/challenges?mode=${mode}&difficulty=${difficulty}&scope=${scope}&from=${source}&reciter=${reciter}&lang=${lang}`, { signal: c.signal })
       .then(async r => { const body = await r.json(); if (!r.ok) throw new Error(body.error); return body; })
       .then(setQuestion).catch(e => { if (e.name !== "AbortError") setError(e.message); });
     return () => { c.abort(); stopAudio(); };
-  }, [mode, difficulty, scope, round, reciter, lang, profileRevision]);
+  }, [mode, difficulty, scope, source, round, reciter, lang, profileRevision]);
   const award = (right: boolean, evidence: "choice" | "asr" = "choice") => {
     if (!question || revealed || answered.current === `${question.id}:${round}`) return;
     answered.current = `${question.id}:${round}`;
@@ -98,6 +101,7 @@ export default function GamesPage() {
     <section className="challenge-settings"><label>{c("Difficulty", "الصعوبة")}<select aria-label={c("Challenge difficulty", "صعوبة التحدي")} disabled={adaptive} value={difficulty} onChange={e => setDifficulty(e.target.value as Difficulty)}><option value="easy">{c("Gentle · related choices", "سهل · خيارات ذات صلة")}</option><option value="medium">{c("Growing · closer choices", "متوسط · خيارات أقرب")}</option><option value="hard">{c("Focused · near-identical choices", "صعب · خيارات شبه متطابقة")}</option></select></label>
       <label><input type="checkbox" checked={adaptive} onChange={e => setAdaptive(e.target.checked)} />{c("Personalized difficulty · prototype", "صعوبة شخصية · نموذج أولي")}</label>
       <label>{c("Reading scope", "نطاق القراءة")}<select aria-label={c("Challenge scope", "نطاق التحدي")} value={scope} onChange={e => setScope(e.target.value)}><option value="amma">{c("Fātiḥah + Juz ʿAmma", "الفاتحة وجزء عمّ")}</option><option value="all">{c("Whole Quran · ASR experimental", "القرآن كاملًا · التعرف الصوتي تجريبي")}</option></select></label>
+      {mode !== "order" && <label>{c("Choices from", "الخيارات من")}<select aria-label={c("Where wrong answers come from", "مصدر الخيارات الخاطئة")} value={source} onChange={e => setFrom(e.target.value as ChoiceSource)}>{mode !== "surah" && <option value="surah">{c("Same surah", "السورة نفسها")}</option>}<option value="scope">{c("Reading scope", "نطاق القراءة")}</option><option value="quran">{c("Whole Quran", "القرآن كله")}</option></select></label>}
       <ReciterSelector value={reciter} onChange={selectReciter} />
       <label><input type="checkbox" checked={phonetics} onChange={e => setPhonetics(e.target.checked)} />{c("Transliteration (draft phonetic aid)", "نقل صوتي بالحروف اللاتينية (تجريبي)")}</label></section>
     {adaptive && <p className="safety-note">{c("Difficulty changes on the next question from your recent choice answers—not XP or ASR confidence. Closer alternatives follow steady success; mistakes bring gentler practice. Local, explainable policy; not a trained learner model.", "تتغير الصعوبة في السؤال التالي وفق إجابات الخيارات الأخيرة، لا النقاط ولا ثقة التعرف الصوتي. تقارب البدائل بعد النجاح المستمر، وتيسيرها بعد الأخطاء. سياسة محلية قابلة للتفسير وليست نموذج تعلم مدرّبًا.")}</p>}

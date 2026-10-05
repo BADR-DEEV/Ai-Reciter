@@ -87,20 +87,43 @@ For two ayahs (or two words), `closeness()` in `web/lib/challenges.ts` adds:
 
 Per challenge:
 
-- **What comes next?** Ranks every ayah against the right one. The ayah on screen is
-  never offered, and ayahs from the same surah get +0.1, since mixing up the order
-  inside a surah is the most common memorisation slip.
-- **Find the surah.** A surah scores as its closest ayah to the prompt.
+- **What comes next?** Ranks every ayah against the right one. Outside "Same surah",
+  ayahs from the target's surah get +0.1, since mixing up the order inside a surah is
+  the most common memorisation slip. Never offered:
+  - the ayah on screen, or a near copy of it (letter-pair overlap ≥ 0.85), such as
+    `كلا سوف تعلمون` under `ثم كلا سوف تعلمون`;
+  - what follows another copy of the ayah on screen. After a repeated ayah such as
+    `ولا أنتم عابدون ما أعبد` (Al-Kāfirūn 3 and 5), both successors are right answers.
+- **Find the surah.** A surah scores as its closest ayah to the prompt. An ayah whose
+  text also occurs in another surah of the choice pool is never asked.
 - **Listen & match.** Blends the MFCC recording index (when built) 50/50 with the text score.
 - **Restore the word.** Ranks words by the same signals on letters only. A word that
   differs from the answer only by vowels or Qālūn marks is never offered, because the
-  wasl vowel of `اَ۬لنَّاسِ` / `اِ۬لنَّاسِ` changes with the word before it.
+  wasl vowel of `اَ۬لنَّاسِ` / `اِ۬لنَّاسِ` changes with the word before it. A word
+  already visible elsewhere in the ayah is never offered for the gap.
 - **Ayah sequence.** Hard picks three consecutive ayahs that resemble each other and
   swaps two neighbours; easy picks dissimilar ayahs and scrambles the whole order.
 
 Difficulty picks from rank windows: hard from ranks 1–6, medium 7–20, easy 21–60
 (surahs use half these windows, words one and a half times). Easy choices are
-related but distinguishable, not random.
+related but distinguishable, not random. Candidates are deduplicated by text before
+ranking, so a refrain repeated 31 times in Ar-Raḥmān cannot fill a window by itself.
+
+### Choices from
+
+The **Choices from** setting (`from=` on `/api/challenges`) picks the pool that wrong
+answers are drawn from. The reading scope still decides which questions are asked.
+
+| Setting | Pool | Applies to |
+| --- | --- | --- |
+| Same surah | Ayahs (or words, or recordings) of the right answer's surah | Next, word, listening |
+| Reading scope (default) | Fātiḥah + Juz ʿAmma, or the whole Quran if that scope is chosen | All but the sequence game |
+| Whole Quran | All 6,210 ayahs, whatever the reading scope | Next, surah, word; listening only has clips for Juz ʿAmma |
+
+A surah too short for two same-surah choices, such as Al-Kawthar, is topped up from
+the reading scope, and the method note under the question says so. Adaptive
+difficulty keeps a separate history per source, because "hard" means something
+different in each.
 
 ## Limits
 
