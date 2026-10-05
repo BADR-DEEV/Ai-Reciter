@@ -172,10 +172,23 @@ class RecitationTracker:
             if target != self.index and not stable:
                 break
             if target != self.index:
+                # A fast reader's skipped-over ayahs are often decoded only together with the
+                # later ayah. Credit their words heard in this window before the later ayah,
+                # in order; a genuinely skipped ayah has none there and stays red. As for a
+                # tentative prefix, one lone word may be a hallucinated tail and needs a second.
+                later_start = min((j for _, j in pairs), default=len(heard))
+                cursor = 0
                 for skipped in range(self.index, target):
                     ayah = self.ayahs[skipped]
                     previous = self.results.get(ayah["ayah"], {})
-                    word_results = [dict(word, status="correct" if word["status"] == "correct" else "pending" if self.uncertain_audio else "missed")
+                    expected = words(ayah["normalized"])
+                    heard_here = dict(alignment(expected, heard[cursor:later_start]))
+                    if len(heard_here) < min(2, len(expected)):
+                        heard_here = {}
+                    if heard_here:
+                        cursor += max(heard_here.values()) + 1
+                    word_results = [dict(word, status="correct" if word["status"] == "correct" or word["index"] in heard_here
+                                         else "pending" if self.uncertain_audio else "missed")
                                     for word in previous.get("words", self.word_results(skipped, [], [], completed=True))]
                     coverage = sum(word["status"] == "correct" for word in word_results) / max(1, len(word_results))
                     self.results[ayah["ayah"]] = {"status": "correct" if coverage >= self.threshold else "listening" if self.uncertain_audio else "missed",
