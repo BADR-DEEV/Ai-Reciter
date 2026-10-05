@@ -181,7 +181,9 @@ checkpoint) reuses its tag embeddings.
 
 ### Results
 
-**v2** (installed as `runs/rattil_qaloon_tajweed_v2`): ten readers (5,036 training clips) plus
+**v2** (`runs/rattil_qaloon_tajweed_v2`, published privately as
+[`Mathani-Ayat/rattil-qaloon-tajweed-v2`](https://huggingface.co/Mathani-Ayat/rattil-qaloon-tajweed-v2);
+`python src/deployment/pull_hf_assets.py --models tajweed-v2`): ten readers (5,036 training clips) plus
 the plain TTS negatives, from rattil-v4, speaker-robust augmentation, lr 5e-5. Early stopping ended
 the run after epoch 3. Ahkam mode (v4 words + tajweed tokens), greedy decoding:
 

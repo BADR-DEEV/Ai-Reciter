@@ -20,7 +20,13 @@ STATUS = ROOT / "data/hf/pull-status.json"
 MODELS = {
     "v4": ("Mathani-Ayat/rattil-qaloon-v4", "eb62c35", ROOT / "runs/rattil_qaloon_v4"),  # default (joined-ayah training)
     "v3": ("Mathani-Ayat/rattil-qaloon-v3", "e9e59ac3db6cb096a0657f81f22365be189dda50", ROOT / "runs/rattil_qaloon_v3"),
+    # "Check my ahkam": tajweed tokens, paired with v4's words (docs/QALOON_TAJWEED.md).
+    "tajweed-v2": ("Mathani-Ayat/rattil-qaloon-tajweed-v2", "b986f5b2824bda29547624ab2c7179542920462e",
+                   ROOT / "runs/rattil_qaloon_tajweed_v2"),
+    # Challenge distractors: build_text_embeddings.py uses it instead of the base model (docs/CHALLENGE_DISTRACTORS.md).
+    "ayah-embed": ("Mathani-Ayat/rattil-ayah-embed", "4865b164d43836ed7d1fc3a88870c7dbf3222d5c", ROOT / "runs/rattil_ayah_embed"),
 }
+DEFAULT_MODELS = ["v4", "tajweed-v2", "ayah-embed"]
 DATASETS = {
     # Approved readers used by the web app (reference audio, challenges) plus Garu.
     "qaloon-reciter-dataset": "d0d2bdbbc757d09c05d1f0cdfabd67cc19420a83",
@@ -102,7 +108,8 @@ def link_app_readers(dataset_root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--skip-model", action="store_true")
-    parser.add_argument("--models", nargs="*", choices=list(MODELS), default=["v4"], help="Which Rattil models (default: v4)")
+    parser.add_argument("--models", nargs="*", choices=list(MODELS), default=DEFAULT_MODELS,
+                        help="Which Rattil models (default: v4, tajweed-v2, ayah-embed)")
     parser.add_argument("--datasets", nargs="*", choices=list(DATASETS), default=[d for d in DATASETS if d != "qaloon-all-reciters"],
                         help="Which dataset repos to pull (default: all but qaloon-all-reciters). Pass none to skip datasets.")
     parser.add_argument("--readers-only", action="store_true",

@@ -77,7 +77,7 @@ async function models(): Promise<ModelEntry[]> {
       "Hugging Face Mathani-Ayat/rattil-qaloon-v3@e9e59ac (src/deployment/pull_hf_assets.py)",
       "Waleed (held-out voice): 2.2% WER normal speed · 13.4% at 1.25× · 21.2% at 1.5× (model card)"),
     await fullModel("rattil-tajweed-v2", path.join(ROOT, "runs/rattil_qaloon_tajweed_v2"), "Tajweed fine-tune of v4 · ahkam check (10 readers + plain negatives)",
-      "Trained locally: python -m src.tajweed.prepare_data, src.tajweed.targets, train_base_full.py (docs/QALOON_TAJWEED.md)",
+      "Hugging Face Mathani-Ayat/rattil-qaloon-tajweed-v2@b986f5b (src/deployment/pull_hf_assets.py); recipe in docs/QALOON_TAJWEED.md",
       "Epoch 3. Ahkam mode on Waleed (held-out voice): token precision 0.99 · recall 0.94 · plain unseen voice: 0.019 false tokens/word (v1: 0.147). WER below is the tajweed model alone at epoch 1."),
     await fullModel("rattil-tajweed-v1", path.join(ROOT, "runs/rattil_qaloon_tajweed_v1"), "Tajweed-tagged full fine-tune · first proof of concept",
       "Trained locally: python -m src.tajweed.targets, then train_base_full.py (docs/QALOON_TAJWEED.md)"),
@@ -121,7 +121,7 @@ async function data(): Promise<DataEntry[]> {
     fileEntry("Quran text", "Hafs numbering reference", path.join(pub, "hafs-reference.json"), "cache script (numbering alignment only)", "quran-json (jsdelivr mirror)"),
     fileEntry("Quran text", "Qālūn ↔ Hafs text mapping", path.join(pub, "text-mapping.json"), "cache script", cache),
     dirEntry("Learning", "Qālūn tajweed (rules + per-surah text)", path.join(pub, "tajweed"), /\.json$/, "Studio reader & /tajweed (browser fetch /quran/tajweed)", "python -m src.tajweed.build"),
-    fileEntry("Learning", "Ayah & word embeddings", path.join(pub, "text-embeddings.json"), "/api/challenges (falls back to spelling similarity)", "src/learning/build_text_embeddings.py ← runs/rattil_ayah_embed or Hugging Face", async b => {
+    fileEntry("Learning", "Ayah & word embeddings", path.join(pub, "text-embeddings.json"), "/api/challenges (falls back to spelling similarity)", "src/learning/build_text_embeddings.py ← runs/rattil_ayah_embed (Mathani-Ayat/rattil-ayah-embed) or the base model", async b => {
       const m = await json<{ model?: string; ayahs?: { ids?: unknown[] }; words?: { keys?: unknown[] } }>(path.join(pub, "text-embeddings.json"));
       return `${m?.model ?? "?"} · ${m?.ayahs?.ids?.length ?? "?"} ayahs · ${m?.words?.keys?.length ?? "?"} words · ${mb(b)}`;
     }),

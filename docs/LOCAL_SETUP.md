@@ -11,12 +11,16 @@ the team publishes a new version.
 
 | Repo | Type | Local path | What it is |
 | --- | --- | --- | --- |
-| `Mathani-Ayat/rattil-qaloon-v3` | model | `runs/rattil_qaloon_v3/` | **Default model.** Full Whisper-base fine-tune from `deepdml/whisper-base-ar-quran-mix-norm`, 10 readers, 5,205 clips. Waleed (held-out voice): 2.2% WER at normal speed, 13.4% at 1.25×, 21.2% at 1.5×. |
+| `Mathani-Ayat/rattil-qaloon-v4` | model | `runs/rattil_qaloon_v4/` | **Default model.** v3 trained further on joined consecutive ayahs (the app hears several at once). Waleed (held-out voice): 2.0% WER at normal speed, 11.9% at 1.25×, 20.4% at 1.5×. |
+| `Mathani-Ayat/rattil-qaloon-tajweed-v2` | model | `runs/rattil_qaloon_tajweed_v2/` | Tajweed tokens for "Check my ahkam", served next to v4 (`docs/QALOON_TAJWEED.md`). Waleed: token precision 0.99, recall 0.94. |
+| `Mathani-Ayat/rattil-ayah-embed` | model | `runs/rattil_ayah_embed/` | Ayah embedder for challenge distractors (`docs/CHALLENGE_DISTRACTORS.md`). |
+| `Mathani-Ayat/rattil-qaloon-v3` | model | `runs/rattil_qaloon_v3/` | Previous default. Full Whisper-base fine-tune from `deepdml/whisper-base-ar-quran-mix-norm`, 10 readers, 5,205 clips. Waleed: 2.2% WER at normal speed, 13.4% at 1.25×, 21.2% at 1.5×. Pull with `--models v3`. |
 | `Mathani-Ayat/rattil-qaloon-v2`, `-v1` | model | not pulled | Earlier versions (v2: 2.0% Waleed WER at normal speed, worse on fast recitation). |
 | `Mathani-Ayat/qalon-reciter` | model | not pulled | Mirror of the original team release. |
 | `Mathani-Ayat/qaloon-reciter-dataset` | dataset | `data/hf/qaloon-reciter-dataset/` | Approved readers Huthaify, Husary, Dokali (569 ayahs each) plus Garu, with `train/validation/test.jsonl` split manifests. |
 | `Mathani-Ayat/qaloon-reciter-experiments` | dataset | `data/hf/qaloon-reciter-experiments/` | Waleed (held-out test voice) and Trabulsi. Its `sources.json` marks them unauthorized: private research only. |
 | `Mathani-Ayat/qaloon-new-reciters` | dataset | `data/hf/qaloon-new-reciters/` | Abusnaina, Akri, Daawob, Deeban, Kshidan, Qeniwa (from mp3quran, used for v2/v3) plus `unapproved/`. |
+| `Mathani-Ayat/qaloon-all-reciters` | dataset | `data/hf/qaloon-all-reciters/` | All ten approved readers relabelled with one normalizer; used to train the tajweed model. Not pulled by default (`--datasets qaloon-all-reciters`). |
 
 The older `BadrSh/qalon-reciter` full model (about 26% test WER) restores to
 `runs/gpu_base_full/` via `src/deployment/restore_local_full.py`. It is kept only
@@ -27,8 +31,8 @@ All of these paths are Git-ignored. Never commit audio or weights.
 ## Pull everything
 
 ```bash
-python src/deployment/pull_hf_assets.py                   # model + all 3 datasets (~1.6 GB)
-python src/deployment/pull_hf_assets.py --datasets        # model only
+python src/deployment/pull_hf_assets.py                   # v4, tajweed-v2, ayah-embed + 3 datasets (~2.4 GB)
+python src/deployment/pull_hf_assets.py --datasets        # models only (~1.1 GB)
 python src/deployment/pull_hf_assets.py --skip-model --datasets qaloon-reciter-dataset
 python src/dataset_collection/cache_quran_pages.py --skip-metadata   # Quran page SVGs/text (~350 MB)
 ```
@@ -70,7 +74,7 @@ shows that button. Set `RATTIL_PYTHON` if `python3` isn't the Python with
 python -m src.streaming.serve --model rattil-v4
 #   also offers tajweed=rattil-tajweed-v2 (runs/rattil_qaloon_tajweed_v2, else v1) for
 #   "Check my ahkam": words come from v4, tajweed tokens from the tajweed model. Requests fall
-#   back to plain while no tajweed folder exists. The tajweed models are local (not on HF).
+#   back to plain while no tajweed folder exists.
 #   explicit: --models plain=rattil-v4,tajweed=runs/rattil_qaloon_tajweed_v2
 #   other presets: gpu-full-base (old team model), deepdml (adapter, training PC only)
 
