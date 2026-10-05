@@ -227,14 +227,14 @@ def heard_with_tags(transcript):
     return clean, heard, tags if hyp == heard else [[] for _ in heard]
 
 
-def tajweed_feedback(target_text, hyp_words, hyp_tags):
+def tajweed_feedback(target_text, hyp_words, hyp_tags, surah=None, ayah=None):
     """Optional src.tajweed.feedback hook; never allowed to break recitation."""
     try:
         from src.tajweed.feedback import compare
     except Exception:
         return None
     try:
-        return compare(target_text, hyp_words, hyp_tags)
+        return compare(target_text, hyp_words, hyp_tags, surah, ayah)
     except Exception:
         logger.exception("Tajweed feedback failed; recitation results are unaffected")
         return None
@@ -247,6 +247,10 @@ async def lifespan(app):
         logger.warning("Quran assets missing. For the studio run: python src/dataset_collection/cache_quran_pages.py")
     app.state.models = Registry(models_from_env(os.environ))
     await app.state.models.start()
+    if any(spec.kind == "tajweed" for spec in app.state.models.specs.values()):
+        with suppress(Exception):  # build the feedback's Ḥafṣ alignment now, not during the first ayah
+            from src.tajweed.feedback import _hafs_index
+            await asyncio.to_thread(_hafs_index)
     app.state.sessions = 0
     yield
 
@@ -483,7 +487,7 @@ async def recite(ws: WebSocket):
                 update = tracker.feed(stitched, final=boundary, continuous=True, stable_prefix=stable_prefix, tags=tags) if stitched is not None else tracker.snapshot()
                 update["tajweed_tags"] = tag_list(tags)
                 for ayah, (hyp, hyp_tags) in tracker.tagged_spans.items():
-                    feedback = tajweed_feedback(texts[ayah], hyp, hyp_tags) if kind == "tajweed" else None
+                    feedback = tajweed_feedback(texts[ayah], hyp, hyp_tags, surah, ayah) if kind == "tajweed" else None
                     if feedback is not None:
                         tracker.results[ayah]["tajweed_feedback"] = feedback
                 tracker.tagged_spans.clear()

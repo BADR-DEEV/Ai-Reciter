@@ -281,7 +281,7 @@ class TajweedServerTests(ServerCase):
 
     def test_feedback_hook_is_optional_and_isolated(self):
         calls = []
-        def compare(target_text, hyp_words, hyp_tags):
+        def compare(target_text, hyp_words, hyp_tags, surah=None, ayah=None):
             calls.append((target_text, hyp_words, hyp_tags))
             return {"rules": len(hyp_tags)}
         request = {"mode": "reading", "target": "قل هو", "audio": pcm16(), "model": "tajweed"}
@@ -298,7 +298,7 @@ class TajweedServerTests(ServerCase):
                 self.assertNotIn("tajweed_feedback", response.json())
 
     def test_websocket_reports_word_tags_and_ayah_feedback(self):
-        def compare(target_text, hyp_words, hyp_tags):
+        def compare(target_text, hyp_words, hyp_tags, surah=None, ayah=None):
             return {"target": target_text, "tags": hyp_tags}
         with patch.dict(sys.modules, {"src.tajweed.feedback": SimpleNamespace(compare=compare)}):
             with self.client.websocket_connect("/ws/recite", headers=ORIGIN) as ws:

@@ -6,9 +6,15 @@ missing word is a reading error, reported by the matcher), and only audible
 rules are expected (see targets.py).
 """
 from difflib import SequenceMatcher
+from functools import lru_cache
+import json
+from pathlib import Path
 
 from .rules import RULES
 from .targets import tagged_words
+from .text import ayah_words
+
+QURAN = Path(__file__).resolve().parents[2] / "web/public/quran"
 
 TAG_RULE = {}
 for rule_id, rule in RULES.items():
@@ -16,8 +22,23 @@ for rule_id, rule in RULES.items():
         TAG_RULE.setdefault(rule["tag"], rule_id)
 
 
+@lru_cache(maxsize=1)
+def _hafs_index():
+    """Ḥafṣ alignment for isqāṭ and the yāʾāt, built once (~1 s) like the training labels."""
+    if not (QURAN / "hafs-reference.json").is_file():
+        return None
+    from .hafs import HafsIndex
+    surahs = {}
+    for path in sorted((QURAN / "surahs").glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        surahs[data["id"]] = [(a["ayah"], a["text"]) for a in data["ayahs"]]
+    return HafsIndex(QURAN / "hafs-reference.json", surahs)
+
+
 def compare(target_text, hyp_words, hyp_tags, surah=None, ayah=None):
-    expected = tagged_words(target_text, surah, ayah)
+    index = _hafs_index() if surah and ayah else None
+    hafs = [index.word(surah, ayah, w) for w in range(len(ayah_words(target_text)))] if index else None
+    expected = tagged_words(target_text, surah, ayah, hafs)
     if not expected:
         return None
     matcher = SequenceMatcher(None, [w for _, w, _ in expected], list(hyp_words), autojunk=False)
