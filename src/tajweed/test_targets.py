@@ -8,7 +8,7 @@ from .rules import MODEL_TAGS
 from .targets import TOKENS_FILE, tagged_target, tagged_words
 
 BAQARA_5 = "إِنَّ اَ۬لذِينَ كَفَرُواْ سَوَآءٌ عَلَيْهِمْ ءَٰا۬نذَرْتَهُمْ أَمْ لَمْ تُنذِرْهُمْ لَا يُؤْمِنُونَۖ ٥"
-TAG = re.compile(r"<tj:[a-z_]+>")
+TAG = re.compile(r"<[a-z_]+>")
 
 
 class Targets(unittest.TestCase):
@@ -18,18 +18,26 @@ class Targets(unittest.TestCase):
 
     def test_audible_rules_are_tagged_on_their_word(self):
         words = {word: tags for _, word, tags in tagged_words(BAQARA_5)}
-        self.assertEqual(words["ان"], ["ghunna"])
-        self.assertIn("madd_muttasil", words["سواء"])
-        self.assertTrue({"tasheel", "ikhfa"} <= set(words["اانذرتهم"]))
+        self.assertEqual(words["ان"], ["n_ghunna"])
+        self.assertEqual(words["سواء"], ["mad"])
+        self.assertEqual(words["اانذرتهم"], ["tasheel", "n_ikhfa"])
         self.assertEqual(words["الذين"], [])  # hamzat al-waṣl and silent letters are spelling, not tags
 
     def test_optional_ways_get_no_tag(self):
         self.assertNotIn("madd_munfasil", MODEL_TAGS)
-        self.assertEqual(tagged_target("بِمَا أُنزِلَ"), "بما انزل<tj:ikhfa>")  # munfaṣil on بما: no tag
+        self.assertEqual(tagged_target("بِمَا أُنزِلَ"), "بما انزل<n_ikhfa>")  # munfaṣil is 2 or 4 for Qālūn: no <mad>
 
     def test_token_file_lists_every_tag(self):
         tokens = [line for line in TOKENS_FILE.read_text(encoding="utf-8").splitlines() if not line.startswith("#")]
-        self.assertEqual(tokens, [f"<tj:{t}>" for t in MODEL_TAGS])
+        self.assertEqual(tokens, [f"<{t}>" for t in MODEL_TAGS])
+
+    def test_acoustic_tokens_follow_the_report_mapping(self):
+        self.assertEqual(tagged_target("هُدىٗ مِّن رَّبِّهِمْ"), "هدى من<m_ghunna> ربهم")  # idghām into mīm: on the doubled mīm
+        self.assertEqual(tagged_target("وَمَا هُم بِمُؤْمِنِينَ"), "وما هم<m_ikhfa> بمؤمنين")
+        self.assertEqual(tagged_target("عَذَابٌ أَلِيمُۢ بِمَا"), "عذاب اليم<m_ikhfa> بما")
+        self.assertEqual(tagged_target("مَنْ يَّقُولُ"), "من<idgham_ghunna> يقول")
+        self.assertEqual(tagged_target("مِن رَّبِّهِمْ"), "من ربهم")  # idghām without ghunna: no acoustic token
+        self.assertEqual(tagged_target("إِنَّ اَ۬لذِينَ", plain=True), "ان الذين")  # plain-reading negative
 
 
 class Feedback(unittest.TestCase):
@@ -40,13 +48,15 @@ class Feedback(unittest.TestCase):
         hyp_tags[[w for _, w, _ in expected].index("سواء")] = []
         result = compare(BAQARA_5, hyp_words, hyp_tags)
         sawa = next(w for w in result["words"] if w["text"] == "سواء")
-        self.assertEqual(sawa["missed"], ["madd_muttasil"])
-        self.assertEqual(result["rules"]["madd_muttasil"]["applied"], 0)
-        self.assertEqual(result["rules"]["ghunna"], {**result["rules"]["ghunna"], "expected": 1, "applied": 1})
+        self.assertEqual(sawa["missed"], ["mad"])
+        self.assertEqual(result["rules"]["mad"]["applied"], 0)
+        self.assertEqual(result["rules"]["n_ghunna"], {**result["rules"]["n_ghunna"], "expected": 1, "applied": 1})
+        self.assertEqual([(m["text"], m["tag"]) for m in result["mistakes"]], [("سواء", "mad")])
+        self.assertIn("4 counts", result["mistakes"][0]["fix_en"])
         self.assertLess(result["score"], 1)
 
     def test_unrecognised_words_are_not_judged(self):
-        result = compare(BAQARA_5, ["ان", "الذين"], [["ghunna"], []])
+        result = compare(BAQARA_5, ["ان", "الذين"], [["n_ghunna"], []])
         self.assertEqual([w["text"] for w in result["words"]], ["ان"])
         self.assertEqual(result["score"], 1.0)
 

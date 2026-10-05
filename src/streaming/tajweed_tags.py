@@ -1,12 +1,21 @@
-"""Tajweed tag tokens (`<tj:name>`) that the tajweed model appends to words.
+"""Tajweed tokens (`<n_ikhfa>`, `<qalqala>`, `<mad>`, ...) that the tajweed model appends to words.
 
-A tag belongs to the PRECEDING word; a tag before any word is dropped. Tags are
-removed before normalization/matching, so word matching never depends on them.
+A tag belongs to the word it sits in or follows; a tag before any word is
+dropped. Tags are removed before normalization/matching, so word matching never
+depends on them. The first model's `<tj:name>` tags are read too and renamed.
 """
 from difflib import SequenceMatcher
 import re
 
-TAG = re.compile(r"<\s*tj\s*:\s*([a-z_]+)\s*>")
+TAG = re.compile(r"<\s*(tj\s*:\s*)?([a-z_]+)\s*>")
+# rattil-tajweed-v1 (<tj:...>) names → the current acoustic tokens (src/tajweed/rules.py TAGS)
+LEGACY = {"ikhfa": "n_ikhfa", "iqlab": "m_ikhfa", "ikhfa_shafawi": "m_ikhfa", "ghunna": "n_ghunna", "idgham_shafawi": "m_ghunna",
+          "madd_lazim": "mad", "madd_muttasil": "mad", "idgham_ghunna": "idgham_ghunna", "qalqala": "qalqala",
+          "silah": "silah", "tasheel": "tasheel"}
+
+
+def tag_name(match):
+    return LEGACY.get(match.group(2)) if match.group(1) else match.group(2)
 
 
 def tokens(text):
@@ -17,7 +26,7 @@ def tokens(text):
     pieces, marks, last = [], [], 0
     for match in TAG.finditer(text):
         pieces.append(text[last:match.start()])
-        marks.append((sum(map(len, pieces)), match.group(1)))
+        marks.append((sum(map(len, pieces)), tag_name(match)))
         last = match.end()
     pieces.append(text[last:])
     clean = "".join(pieces)
@@ -31,7 +40,7 @@ def tokens(text):
                 break
             if end <= position:
                 owner = i
-        if owner is not None and tag not in out[owner][1]:
+        if tag and owner is not None and tag not in out[owner][1]:
             out[owner][1].append(tag)
     return out
 
@@ -95,4 +104,4 @@ def transfer_tags(plain, tagged, normalize=str.split):
         if op == "equal" or (op == "replace" and i2 - i1 == j2 - j1):
             for k in range(i2 - i1):
                 tags[i1 + k] = heard[j1 + k][1]
-    return " ".join(word + "".join(f"<tj:{t}>" for t in word_tags) for word, word_tags in zip(plain_words, tags))
+    return " ".join(word + "".join(f"<{t}>" for t in word_tags) for word, word_tags in zip(plain_words, tags))

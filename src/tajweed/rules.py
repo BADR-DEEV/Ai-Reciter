@@ -4,6 +4,10 @@
 is taught. `level` "core" rules are coloured by default; "detail" rules are
 available behind the reader's "all details" switch. `tag` is the token the
 tajweed model learns for rules whose realisation is audible (see targets.py).
+Tokens follow the acoustic-driven design of "Evaluating Automatic Speech
+Recognition" (Table 4.6): rules that sound alike share a token, rules without
+an acoustic marker (idghām without ghunna, iẓhār) get none. Adapted to Qālūn:
+munfaṣil is 2 or 4 for Qālūn so it gets no <mad>, and <tasheel>/<silah> are added.
 """
 
 GROUPS = {
@@ -23,23 +27,23 @@ GROUPS = {
 # id: group, level, harakat, page, tag, en, ar, explain_en, explain_ar[, wajh]
 _RULES = [
     # ── Madd (pp. 58-66, Qālūn pp. 90-92) ──────────────────────────────────
-    ("madd_lazim", "madd_necessary", "core", [6], 63, "madd_lazim",
+    ("madd_lazim", "madd_necessary", "core", [6], 63, "mad",
      "Necessary madd", "مد لازم كلمي",
      "A long vowel followed by a permanent sukūn or shadda in the same word. Hold it 6 counts.",
      "حرف مد بعده سكون أصلي أو حرف مشدد في الكلمة نفسها، يُمد ست حركات وصلًا ووقفًا."),
-    ("madd_lazim_harfi", "madd_necessary", "core", [6], 64, "madd_lazim",
+    ("madd_lazim_harfi", "madd_necessary", "core", [6], 64, "mad",
      "Necessary madd (opening letters)", "مد لازم حرفي",
      "An opening letter whose name has three letters with a long vowel in the middle (ل م ن ق ص س ك). 6 counts.",
      "حروف فواتح السور المجموعة في «نقص عسلكم» تُمد ست حركات."),
-    ("madd_ayn", "madd_permitted", "core", [6, 4], 65, "madd_lazim",
+    ("madd_ayn", "madd_permitted", "core", [6, 4], 65, "mad",
      "ʿAyn in Kāf-Hā-Yā-ʿAyn-Ṣād / ʿAyn-Sīn-Qāf", "عين فاتحتي مريم والشورى",
      "The letter ʿayn here may be held 6 counts (preferred) or 4.",
      "يجوز فيها الإشباع والتوسط، والإشباع هو المقدم.", ["6 (preferred)", "4"]),
-    ("madd_muttasil", "madd_connected", "core", [4], 90, "madd_muttasil",
+    ("madd_muttasil", "madd_connected", "core", [4], 90, "mad",
      "Connected madd", "مد متصل",
      "A long vowel followed by a hamza in the same word. Qālūn holds it 4 counts (tawassuṭ).",
      "حرف مد بعده همز في كلمة واحدة، ولقالون فيه التوسط أربع حركات."),
-    ("madd_muttasil_waqf", "madd_connected", "core", [4, 6], 113, "madd_muttasil",
+    ("madd_muttasil_waqf", "madd_connected", "core", [4, 6], 113, "mad",
      "Connected madd when stopping", "مد متصل موقوف عليه",
      "The word ends in hamza and you stop on it: 4 counts, or 6 because the stop strengthens the hamza.",
      "تطرّف الهمز ووُقف عليه بالسكون: التوسط والإشباع لتقوي الهمز بالسكون.", ["4", "6"]),
@@ -84,15 +88,15 @@ _RULES = [
      "A sākin letter follows in the next word, so this long vowel is read short when you join the words.",
      "إذا التقى حرف المد بساكن في الكلمة التالية حُذف لفظًا عند الوصل للتخلص من التقاء الساكنين."),
     # ── Nūn sākinah / tanwīn, mīm (pp. 46-53) ───────────────────────────────
-    ("ghunna", "nasal", "core", [2], 51, "ghunna",
+    ("ghunna", "nasal", "core", [2], 51, "n_ghunna",
      "Ghunna", "غنة",
      "Nūn or mīm with shadda: hold the nasal sound 2 counts.",
      "النون والميم المشددتان تُظهر غنتهما بمقدار حركتين."),
-    ("ikhfa", "nasal", "core", [2], 49, "ikhfa",
+    ("ikhfa", "nasal", "core", [2], 49, "n_ikhfa",
      "Ikhfāʾ (hidden nūn)", "إخفاء حقيقي",
      "Nūn sākinah or tanwīn before one of 15 letters: hide the n into a nasal sound for 2 counts, without shadda.",
      "النون الساكنة أو التنوين قبل أحد خمسة عشر حرفًا: نطق بين الإظهار والإدغام مع غنة حركتين."),
-    ("iqlab", "nasal", "core", [2], 49, "iqlab",
+    ("iqlab", "nasal", "core", [2], 49, "m_ikhfa",
      "Iqlāb (n becomes m)", "إقلاب",
      "Nūn sākinah or tanwīn before bāʾ turns into a hidden mīm with ghunna, 2 counts.",
      "تُقلب النون الساكنة أو التنوين ميمًا مخفاة بغنة عند الباء."),
@@ -100,15 +104,15 @@ _RULES = [
      "Idghām with ghunna", "إدغام بغنة",
      "Nūn sākinah or tanwīn merges into the next word's ي ن م و, keeping the nasal sound 2 counts.",
      "تُدغم النون الساكنة أو التنوين في حروف «ينمو» من كلمتين مع الغنة."),
-    ("ikhfa_shafawi", "nasal", "core", [2], 52, "ikhfa_shafawi",
+    ("ikhfa_shafawi", "nasal", "core", [2], 52, "m_ikhfa",
      "Lip ikhfāʾ", "إخفاء شفوي",
      "Mīm sākinah before bāʾ: close the lips lightly with ghunna, 2 counts. (With mīm al-jamʿ this is the sukūn way.)",
      "الميم الساكنة قبل الباء تُخفى بغنة. (في ميم الجمع هذا على وجه الإسكان.)"),
-    ("idgham_shafawi", "nasal", "core", [2], 52, "idgham_shafawi",
+    ("idgham_shafawi", "nasal", "core", [2], 52, None,
      "Lip idghām", "إدغام شفوي (مثلين صغير)",
      "Mīm sākinah merges into the next mīm with ghunna, 2 counts.",
      "الميم الساكنة تُدغم في الميم بعدها مع إظهار الغنة."),
-    ("idgham_no_ghunna", "merge", "core", None, 48, "idgham_no_ghunna",
+    ("idgham_no_ghunna", "merge", "core", None, 48, None,
      "Idghām without ghunna", "إدغام بغير غنة",
      "Nūn sākinah or tanwīn merges completely into lām or rāʾ. No nasal sound.",
      "تُدغم النون الساكنة أو التنوين في اللام والراء إدغامًا كاملًا بلا غنة."),
@@ -141,7 +145,7 @@ _RULES = [
      "Moon-letter lām", "لام قمرية",
      "The lām of al- is pronounced clearly.",
      "تُظهر لام التعريف قبل الحروف القمرية."),
-    ("idgham_harf", "merge", "core", None, 54, "idgham",
+    ("idgham_harf", "merge", "core", None, 54, None,
      "Idghām of letters", "إدغام المتماثلين والمتجانسين والمتقاربين",
      "This sākin letter merges into the next (doubled) letter, which is read with shadda.",
      "يُدغم الحرف الساكن في الحرف المشدد بعده فيصيران حرفًا واحدًا مشددًا."),
@@ -188,16 +192,16 @@ _RULES = [
      "Tas-hīl (eased hamza)", "تسهيل الهمزة",
      "Qālūn eases this hamza between a hamza and the vowel letter of its ḥaraka. Learn it by listening.",
      "يُنطق بالهمز بينه وبين الحرف المجانس لحركته، ويُضبط بالمشافهة."),
-    ("isqat", "riwaya", "core", None, 98, "isqat",
+    ("isqat", "riwaya", "core", None, 98, None,
      "Dropped first hamza", "إسقاط الهمزة الأولى",
      "Two hamzas with fatḥa meet across words: Qālūn drops the first. The long vowel before it: 2 (preferred) or 4.",
      "إذا اتفقت الهمزتان بالفتح من كلمتين أسقط قالون الأولى، مع جواز القصر وهو المقدم والتوسط.",
      ["2 (preferred)", "4"]),
-    ("ibdal", "riwaya", "core", None, 101, "ibdal",
+    ("ibdal", "riwaya", "core", None, 101, None,
      "Hamza changed to a letter", "إبدال الهمزة",
      "Qālūn replaces this hamza with a vowel letter (alif, wāw or yāʾ).",
      "أبدل قالون الهمزة حرفًا من جنس حركة ما قبلها."),
-    ("naql", "riwaya", "core", None, 102, "naql",
+    ("naql", "riwaya", "core", None, 102, None,
      "Naql (vowel moved)", "نقل حركة الهمزة",
      "Qālūn moves the hamza's vowel onto the sākin letter before it and drops the hamza.",
      "نقل قالون حركة الهمز إلى الساكن قبله وأسقط الهمز."),
@@ -205,7 +209,7 @@ _RULES = [
      "Hamza omitted", "حذف الهمزة",
      "Qālūn reads this word without its hamza.",
      "حذف قالون الهمزة من هذه الكلمة."),
-    ("imala", "riwaya", "core", None, 110, "imala",
+    ("imala", "riwaya", "core", None, 110, None,
      "Imāla", "إمالة كبرى",
      "Qālūn tilts the ā toward ī here (هارٍ). It is his only major imāla.",
      "أمال قالون لفظ «هارٍ» بالتوبة إمالة كبرى وصلًا ووقفًا، ولا إمالة كبرى له في غيره."),
@@ -273,4 +277,26 @@ PRIORITY = {rid: i for i, rid in enumerate(
      "izhar_shafawi", "izhar_qamari"])}
 assert set(PRIORITY) == set(RULES), set(PRIORITY) ^ set(RULES)
 
-MODEL_TAGS = sorted({r["tag"] for r in RULES.values() if r["tag"]})
+# Ghunna on a mīm and idghām into nūn/mīm are refined per letter in targets.py.
+TAGS = {
+    "n_ikhfa": {"en": "Ikhfāʾ of nūn", "ar": "إخفاء النون", "rules": ["ikhfa"],
+                "fix_en": "Hide the nūn: no tongue contact, a nasal hum for 2 counts.", "fix_ar": "أخفِ النون دون أن يلمس اللسان مخرجها، مع غنة حركتين."},
+    "m_ikhfa": {"en": "Lip ikhfāʾ / iqlāb", "ar": "الإخفاء الشفوي والإقلاب", "rules": ["iqlab", "ikhfa_shafawi"],
+                "fix_en": "Close the lips lightly on a hidden mīm and hum for 2 counts before the bāʾ.", "fix_ar": "أطبق الشفتين على ميم مخفاة مع غنة حركتين قبل الباء."},
+    "n_ghunna": {"en": "Ghunna of nūn", "ar": "غنة النون", "rules": ["ghunna", "idgham_ghunna"],
+                 "fix_en": "Hold the doubled nūn's nasal sound for 2 counts.", "fix_ar": "أظهر غنة النون المشددة بمقدار حركتين."},
+    "m_ghunna": {"en": "Ghunna of mīm", "ar": "غنة الميم", "rules": ["ghunna", "idgham_ghunna", "idgham_shafawi"],
+                 "fix_en": "Hold the doubled mīm's nasal sound for 2 counts.", "fix_ar": "أظهر غنة الميم المشددة بمقدار حركتين."},
+    "idgham_ghunna": {"en": "Idghām with ghunna (ي و)", "ar": "الإدغام الناقص في الياء والواو", "rules": ["idgham_ghunna"],
+                      "fix_en": "Merge the nūn into the yāʾ/wāw but keep its nasal sound for 2 counts.", "fix_ar": "أدغم النون في الياء أو الواو مع بقاء الغنة حركتين."},
+    "qalqala": {"en": "Qalqala", "ar": "القلقلة", "rules": ["qalqala", "qalqala_waqf"],
+                "fix_en": "Let the sākin letter bounce with a short echo, without adding a vowel.", "fix_ar": "أظهر نبرة الحرف الساكن واهتزازه دون أن تحركه."},
+    "mad": {"en": "Madd beyond 2 counts", "ar": "المد الزائد على حركتين", "rules": ["madd_lazim", "madd_lazim_harfi", "madd_ayn", "madd_muttasil", "madd_muttasil_waqf"],
+            "fix_en": "Hold this long vowel longer: 4 counts for muttaṣil, 6 for lāzim.", "fix_ar": "أطل المد: أربع حركات في المتصل وست في اللازم."},
+    "silah": {"en": "Ṣilah of the pronoun hā", "ar": "صلة هاء الكناية", "rules": ["madd_silah"],
+              "fix_en": "Lengthen the hā to hū / hī for 2 counts when joining.", "fix_ar": "صِل الهاء بواو أو ياء لفظية بمقدار حركتين."},
+    "tasheel": {"en": "Tas-hīl (Qālūn)", "ar": "التسهيل لقالون", "rules": ["tasheel"],
+                "fix_en": "Ease this hamza between hamza and alif/yāʾ/wāw; do not say it fully as Ḥafṣ does.", "fix_ar": "سهّل الهمزة بين الهمزة والحرف المجانس لحركتها، ولا تحققها كحفص."},
+}
+MODEL_TAGS = sorted(TAGS)
+assert {r["tag"] for r in RULES.values() if r["tag"]} <= set(TAGS)

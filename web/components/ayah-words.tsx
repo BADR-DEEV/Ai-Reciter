@@ -16,17 +16,19 @@ function Words({ ayah, result, tajweed, rules, settings, feedback, lang = "en", 
   const words = tajweed?.w.length === fallback.length ? tajweed.w : fallback;
   const colored = Boolean(settings?.show && rules && words !== fallback);
   const missed = missedByWord(feedback);
+  const missedRules = (word: number) => new Set([...(missed.get(word) || [])].flatMap(tag => rules?.tags?.[tag]?.rules || []));
   return <>{words.map((segments, index) => {
     const word = result?.words?.[index];
     const status = word?.status || "pending";
     const label = lang === "ar" ? status === "correct" ? "مطابق للنص" : status === "missed" ? "لم يطابق النص" : "لم تصل إليه" : status === "correct" ? "Matched" : status === "missed" ? "Omitted / not matched" : "Not reached";
-    const misses = missed.get(index);
+    const misses = missed.has(index) ? missedRules(index) : null;
     return <span key={index}><span className={`quran-word ${status} ${colored ? "tajweed-word" : ""} ${activeWord === index ? "playback-word" : ""}`} data-word-index={index} aria-current={activeWord === index ? "true" : undefined} data-status={status} title={`${label}${word?.heard ? ` · ${word.heard}` : ""}`}>
-      {colored ? segments.map((segment, i) => {
-        const shown = visibleRules(segment[1], rules!, settings!);
-        if (!shown.length) return segment[0];
-        const miss = misses && segment[1]!.some(r => misses.has(rules!.rules[rules!.order[r]]?.tag || ""));
-        return <span key={i} className={`tajweed-span tj-${rules!.rules[shown[0]].group}${miss ? " tj-miss" : ""}`} data-tj={segment[1]!.join(",")} data-w={index}>{segment[0]}</span>;
+      {colored || misses ? segments.map((segment, i) => {
+        const shown = colored ? visibleRules(segment[1], rules!, settings!) : [];
+        const miss = Boolean(misses && segment[1]?.some(r => misses.has(rules!.order[r])));
+        if (!shown.length && !miss) return segment[0];
+        // Missed ahkam stay underlined even with tajweed colours off.
+        return <span key={i} className={`tajweed-span${shown.length ? ` tj-${rules!.rules[shown[0]].group}` : ""}${miss ? " tj-miss" : ""}`} data-tj={segment[1]!.join(",")} data-w={index}>{segment[0]}</span>;
       }) : wordText(segments)}
     </span>{" "}</span>;
   })}</>;

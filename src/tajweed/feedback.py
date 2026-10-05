@@ -10,17 +10,11 @@ from functools import lru_cache
 import json
 from pathlib import Path
 
-from .rules import RULES
+from .rules import TAGS
 from .targets import tagged_words
 from .text import ayah_words
 
 QURAN = Path(__file__).resolve().parents[2] / "web/public/quran"
-
-TAG_RULE = {}
-for rule_id, rule in RULES.items():
-    if rule["tag"]:
-        TAG_RULE.setdefault(rule["tag"], rule_id)
-
 
 @lru_cache(maxsize=1)
 def _hafs_index():
@@ -61,6 +55,8 @@ def compare(target_text, hyp_words, hyp_tags, surah=None, ayah=None):
                           "extra": sorted(heard - set(wanted))})
     total = sum(e for e, _ in per_rule.values())
     applied = sum(a for _, a in per_rule.values())
-    return {"words": words, "expected": total, "applied": applied, "score": round(applied / total, 3) if total else None,
-            "rules": {tag: {"rule": TAG_RULE[tag], "en": RULES[TAG_RULE[tag]]["en"], "ar": RULES[TAG_RULE[tag]]["ar"],
-                            "expected": e, "applied": a} for tag, (e, a) in sorted(per_rule.items())}}
+    names = {tag: {k: TAGS[tag][k] for k in ("en", "ar", "fix_en", "fix_ar")} for tag in per_rule if tag in TAGS}
+    mistakes = [{"word": w["word"], "text": w["text"], "tag": tag, **names.get(tag, {})} for w in words for tag in w["missed"]]
+    return {"words": words, "mistakes": mistakes, "expected": total, "applied": applied,
+            "score": round(applied / total, 3) if total else None,
+            "rules": {tag: {**names.get(tag, {}), "expected": e, "applied": a} for tag, (e, a) in sorted(per_rule.items())}}

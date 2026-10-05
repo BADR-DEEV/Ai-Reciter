@@ -93,7 +93,15 @@ export default function Studio() {
   const progress = surah ? Math.round(finalized.length / surah.ayahs.length * 100) : 0;
   const pagePath = pages[pageIndex], pageInfo = pagePath ? manifest?.pages[pagePath.split("/").pop()!] : null;
   const filtered = manifest?.surahs.filter(s => `${s.id} ${s.name} ${s.arabic}`.toLowerCase().includes(query.toLowerCase())) || [];
-  const feedback = Object.values(results).map(r => r.tajweed_feedback as TajweedFeedback | undefined).filter((f): f is TajweedFeedback => Boolean(f));
+  const feedback = Object.entries(results).flatMap(([ayah, r]) => r.tajweed_feedback ? [[Number(ayah), r.tajweed_feedback as TajweedFeedback] as [number, TajweedFeedback]] : []);
+  const showMistake = (ayah: number, word: number) => {
+    if (mode !== "text") setMode("text");
+    requestAnimationFrame(() => {
+      const target = textReader.current?.querySelector<HTMLElement>(`[data-ayah="${ayah}"] [data-word-index="${word}"]`);
+      target?.scrollIntoView({ block: "center", behavior: "smooth" });
+      target?.classList.add("tj-flash"); setTimeout(() => target?.classList.remove("tj-flash"), 1600);
+    });
+  };
   useEffect(() => { const page = readingAyah?.regions[0]?.page; if (page && pages.includes(page)) setPageIndex(pages.indexOf(page)); }, [readingAyah, pages]);
   useEffect(() => { if (active) { stopAudio(); setPlayback(null); } }, [active]);
   useEffect(() => {
@@ -176,7 +184,7 @@ export default function Studio() {
               <div className="privacy-note"><ShieldCheck size={13} />{c("Inference is local. Reference listening uses cached audio.", "الاستدلال محلي، والاستماع يستخدم المقاطع المحفوظة.")}</div>
               {!active && recitation.state !== "complete" && <button className="demo-link" disabled={!surah || loading} onClick={recitation.startDemo}><Play size={12} />{c("Try the presentation demo", "جرّب العرض التوضيحي")}</button>}
             </section>
-            {tajweedSettings.check && <TajweedFeedbackCard feedback={feedback} />}
+            {tajweedSettings.check && <TajweedFeedbackCard entries={feedback} rules={tajweed.rules} ayahs={tajweed.ayahs} onPick={showMistake} />}
             <section className="progress-card"><div className="section-heading"><h3>{c("Your session", "جلستك")}</h3><button className="icon-button" aria-label={c("Reset session", "أعد ضبط الجلسة")} disabled={active} onClick={recitation.reset}><RotateCcw size={15} /></button></div><div className="progress-title"><strong>{finalized.length}<span> / {surah?.ayahCount || 7} {c("ayahs", "آيات")}</span></strong><span>{progress}%</span></div><div className="progress-track"><span style={{ width: `${progress}%` }} /></div><div className="stat-row"><div><CheckCircle2 size={15} /><strong>{heardWords}</strong><span>{c("Heard words", "كلمات مطابقة")}</span></div><div><CircleHelp size={15} /><strong>{omittedWords}</strong><span>{c("Unmatched words", "كلمات غير مطابقة")}</span></div><div><strong>{Math.floor(recitation.seconds / 60)}:{String(recitation.seconds % 60).padStart(2, "0")}</strong><span>{c("Time", "الوقت")}</span></div></div></section>
             <section className="current-card"><div className="section-heading"><h3>{c("Your place", "موضعك")}</h3><span className="mini-pill">{place ? c(`Ayah ${place}`, `الآية ${place}`) : c("Complete", "اكتملت")}</span></div>{readingAyah && (mode === "phonetic" ? <p className="current-phonetic" lang="en" dir="ltr">{qaloonG2P(readingAyah.text).text}</p> : <p lang="ar" dir="rtl" className="current-text"><AyahWords ayah={readingAyah} result={results[readingAyah.ayah]} tajweed={tajweed.ayahs?.get(readingAyah.ayah)} lang={lang} /></p>)}<p className="current-hint">{tajweedSettings.check ? c("Words come from recognition; ahkam from the early tajweed model.", "الكلمات من التعرف الصوتي، والأحكام من نموذج التجويد الأولي.") : c("Matching tracks recognized text, not pronunciation or tajweed correctness.", "المطابقة تتابع النص المتعرَّف عليه، وليست حكمًا على النطق أو التجويد.")}</p></section>
           </aside>

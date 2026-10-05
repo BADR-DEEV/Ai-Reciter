@@ -1,18 +1,10 @@
-# Tajweed tag tokens added to the Whisper tokenizer (src/tajweed/targets.py).
-<tj:ghunna>
-<tj:ibdal>
-<tj:idgham>
-<tj:idgham_ghunna>
-<tj:idgham_no_ghunna>
-<tj:idgham_shafawi>
-<tj:ikhfa>
-<tj:ikhfa_shafawi>
-<tj:imala>
-<tj:iqlab>
-<tj:isqat>
-<tj:madd_lazim>
-<tj:madd_muttasil>
-<tj:naql>
-<tj:qalqala>
-<tj:silah>
-<tj:tasheel>
+# Tajweed tokens added to the Whisper tokenizer (src/tajweed/targets.py).
+<idgham_ghunna>
+<m_ghunna>
+<m_ikhfa>
+<mad>
+<n_ghunna>
+<n_ikhfa>
+<qalqala>
+<silah>
+<tasheel>

@@ -8,12 +8,14 @@ ROOT = Path(__file__).resolve().parents[2]
 MODEL_PRESETS = {
     "deepdml": ROOT / "runs/deepdml_qaloon_lora_base_v1/adapter",
     "gpu-full-base": ROOT / "runs/gpu_base_full",
-    # Full fine-tune pulled by src/deployment/pull_hf_assets.py (Mathani-Ayat/rattil-qaloon-v3).
+    # Full fine-tunes pulled by src/deployment/pull_hf_assets.py (Mathani-Ayat/rattil-qaloon-v3 / -v4).
     "rattil-v3": ROOT / "runs/rattil_qaloon_v3",
-    # Tajweed-tagged fine-tune (words carry <tj:...> tags). Optional: reported unavailable until trained.
+    "rattil-v4": ROOT / "runs/rattil_qaloon_v4",
+    # Tajweed fine-tunes (words carry tajweed tokens). Optional: reported unavailable until trained.
     "rattil-tajweed-v1": ROOT / "runs/rattil_qaloon_tajweed_v1",
+    "rattil-tajweed-v2": ROOT / "runs/rattil_qaloon_tajweed_v2",
 }
-TAJWEED_PRESETS = {"rattil-tajweed-v1"}
+TAJWEED_PRESETS = {"rattil-tajweed-v1", "rattil-tajweed-v2"}
 LEGACY_DEFAULT = ROOT / "runs/deepdml_qaloon_lora_base_v1"
 NAME = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 
@@ -48,8 +50,8 @@ class ModelSpec:
 def model_spec(name, value):
     preset, _, override = value.partition(":")
     if preset not in MODEL_PRESETS:
-        return ModelSpec(name, Path(value).expanduser().resolve())
-    return ModelSpec(name, Path(override).expanduser().resolve() if override else MODEL_PRESETS[preset], preset)
+        return ModelSpec(name, Path(value).expanduser().absolute())
+    return ModelSpec(name, Path(override).expanduser().absolute() if override else MODEL_PRESETS[preset], preset)
 
 
 def parse_models(items):
@@ -77,7 +79,8 @@ def parse_models(items):
 def with_tajweed_slot(specs):
     """Always offer the tajweed engine; it plugs in once its directory exists."""
     if not any(spec.kind == "tajweed" for spec in specs.values()):
-        specs = {**specs, "tajweed": model_spec("tajweed", "rattil-tajweed-v1")}
+        newest = "rattil-tajweed-v2" if MODEL_PRESETS["rattil-tajweed-v2"].is_dir() else "rattil-tajweed-v1"
+        specs = {**specs, "tajweed": model_spec("tajweed", newest)}
     return specs
 
 
@@ -86,8 +89,9 @@ def default_name(specs):
 
 
 def default_models():
-    """plain=rattil-v3 when it has been pulled, else None (callers keep their previous default)."""
-    return {"plain": model_spec("plain", "rattil-v3")} if MODEL_PRESETS["rattil-v3"].is_dir() else None
+    """plain=the newest pulled Rattil model (v4, else v3), else None (callers keep their previous default)."""
+    preset = next((p for p in ("rattil-v4", "rattil-v3") if MODEL_PRESETS[p].is_dir()), None)
+    return {"plain": model_spec("plain", preset)} if preset else None
 
 
 def models_from_env(env):

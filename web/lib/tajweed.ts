@@ -25,6 +25,8 @@ export type TajweedRules = {
   order: string[]; groups: Record<string, TajweedGroup>; rules: Record<string, TajweedRule>; counts: Record<string, number>;
   basmala: { w: Segment[][]; n: Note[] }; topics: TajweedTopic[];
   examples: Record<string, [surah: number, ayah: number, word: number, segments: Segment[]][]>;
+  /** Tajweed-model tokens: which rules each covers, and how to fix a miss. */
+  tags: Record<string, { en: string; ar: string; rules: string[]; fix_en: string; fix_ar: string }>;
 };
 
 const BASE = "/quran/tajweed";

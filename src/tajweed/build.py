@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 
 from .engine import annotate, segments
-from .rules import GROUPS, PRIORITY, RULES
+from .rules import GROUPS, PRIORITY, RULES, TAGS
 from .text import ayah_words
 from .topics import TOPICS
 
@@ -96,7 +96,7 @@ def build(quran, out):
     rules = {"v": VERSION, "riwayah": "Qālūn ʿan Nāfiʿ", "tariq": "al-Shāṭibiyyah", "source": SOURCE,
              "context": "waṣl inside the ayah, waqf at its end", "duration_unit": "harakat",
              "order": ORDER, "groups": GROUPS, "rules": RULES, "counts": dict(counts), "digest": digest.hexdigest(),
-             "examples": examples,
+             "examples": examples, "tags": TAGS,
              "hafs_compared": index is not None, "basmala": {"w": basmala_words, "n": basmala_notes},
              "topics": [{**{k: v for k, v in t.items() if k != "split"}, "total": totals[t["id"]], "found": found[t["id"]]}
                         for t in TOPICS]}

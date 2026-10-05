@@ -34,7 +34,7 @@ MODEL_REVISIONS = {
     TARTEEL_TINY_MODEL: "c3d7e624af5c81bef25a10a2af3a5a84cb4dd0f0",
     "openai/whisper-tiny": "169d4a4341b33bc18d8881c4b69c2e104e1cc0af",
 }
-TAG_PATTERN = re.compile(r"<tj:[^<>\s]+>")
+TAG_PATTERN = re.compile(r"<(?:tj:)?[a-z_]+>")  # tajweed tokens: <n_ikhfa>, <mad>, ... (legacy <tj:name>)
 
 
 def configure_generation(model, processor, template=None):
@@ -277,7 +277,7 @@ def strip_tags(text):
 def word_tags(text):
     """[(word, tags)]; a tag belongs to the word it follows (leading tags go to the first word)."""
     words, pending = [], []
-    for token in re.findall(r"<tj:[^<>\s]+>|[^\s<]+", text):
+    for token in re.findall(r"<(?:tj:)?[a-z_]+>|[^\s<]+", text):
         if TAG_PATTERN.fullmatch(token):
             (words[-1][1] if words else pending).append(token)
         else:

@@ -72,6 +72,9 @@ def load_splits(data_root=DATA_ROOT, include=None, exclude=None, seed=42,
                 row = json.loads(line)
                 if row["surah"] == 1 and (row["ayah"] == 0 or row.get("source_ayahs") == [0]) and not include_bismillah:
                     continue
+                if row.get("audit_flagged"):
+                    skipped.append((reciter, row["surah"], row["ayah"], "audit_flagged"))
+                    continue  # audio and label disagree at the edges (qaloon-all-reciters card)
                 path = folder / row["relative_audio_path"]
                 if not path.is_file():
                     raise FileNotFoundError(f"{folder / 'metadata.jsonl'}:{line_number}: {path}")

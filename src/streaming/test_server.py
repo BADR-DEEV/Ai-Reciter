@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from . import server
 
 TEXT = "قل هو الله احد الله الصمد لم يلد ولم يولد ولم يكن له كفؤا احد"
-TAGGED = "قل<tj:qalqala> هو الله احد<tj:qalqala> الله الصمد <tj:qalqala> لم يلد<tj:qalqala> ولم يولد ولم يكن له كفؤا احد<tj:qalqala>"
+TAGGED = "قل<qalqala> هو الله احد<qalqala> الله الصمد <qalqala> لم يلد<qalqala> ولم يولد ولم يكن له كفؤا احد<qalqala>"
 SURAH = {"id": 112, "trained": True, "ayahs": [
     {"ayah": 1, "text": "قُلْ هُوَ اَ۬للَّهُ أَحَدٌۖ\xa0١", "normalized": "قل هو الله احد"},
     {"ayah": 2, "text": "اِ۬للَّهُ اُ۬لصَّمَدُۖ\xa0٢", "normalized": "الله الصمد"},
@@ -359,7 +359,7 @@ class RegistryStartupTests(unittest.TestCase):
 
 class EngineTagDecodingTests(unittest.TestCase):
     def test_tag_tokens_registered_as_special_survive_decoding(self):
-        vocab = {1: "قل", 2: "هو", 9: "<|endoftext|>", 10: "<|startoftranscript|>", 11: "<|ar|>", 50: "<tj:qalqala>"}
+        vocab = {1: "قل", 2: "هو", 9: "<|endoftext|>", 10: "<|startoftranscript|>", 11: "<|ar|>", 50: "<qalqala>"}
         tokenizer = SimpleNamespace(prefix_tokens=[10, 11], eos_token_id=9, all_special_ids=[9, 10, 11, 50],
                                     decode=lambda ids, **kwargs: " ".join(vocab[i] for i in ids))
         class Processor:
@@ -372,5 +372,5 @@ class EngineTagDecodingTests(unittest.TestCase):
         engine.model = SimpleNamespace(dtype=torch.float32, config=SimpleNamespace(max_target_positions=448),
                                        generate=Mock(return_value=SimpleNamespace(sequences=torch.tensor([[10, 11, 1, 50, 2, 9]]))))
         transcript = engine.transcribe(np.ones(16000, dtype=np.float32) * .1)
-        self.assertEqual(transcript, "قل <tj:qalqala> هو")
+        self.assertEqual(transcript, "قل <qalqala> هو")
         self.assertEqual(server.heard_with_tags(transcript), ("قل هو", ["قل", "هو"], [["qalqala"], []]))
