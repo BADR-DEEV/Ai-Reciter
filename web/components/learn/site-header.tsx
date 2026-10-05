@@ -2,9 +2,10 @@
 
 import { Flame, Languages } from "lucide-react";
 import { useLang } from "@/lib/i18n";
+import { DEV_MODE } from "@/lib/dev-mode";
 import { streak, useProgress } from "@/lib/learn/progress";
 
-export function SiteHeader({ active, children }: { active: "home" | "learn" | "games" | "profile" | "studio"; children?: React.ReactNode }) {
+export function SiteHeader({ active, children }: { active: "home" | "learn" | "games" | "profile" | "studio" | "dev"; children?: React.ReactNode }) {
   const { t, toggle, lang } = useLang();
   const { progress, loaded } = useProgress();
   const days = streak(progress.days);
@@ -16,6 +17,7 @@ export function SiteHeader({ active, children }: { active: "home" | "learn" | "g
       <a href="/studio" aria-current={active === "studio" ? "page" : undefined}>{t("studio")}</a>
       <a href="/games" aria-current={active === "games" ? "page" : undefined}>{lang === "ar" ? "تحديات" : "Challenges"}</a>
       <a href="/profile" aria-current={active === "profile" ? "page" : undefined}>{lang === "ar" ? "حسابي" : "Profile"}</a>
+      {DEV_MODE && <a href="/dev" aria-current={active === "dev" ? "page" : undefined}>Dev</a>}
     </nav>
     <div className="lh-right">
       {children}

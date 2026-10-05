@@ -117,7 +117,7 @@ export default function Studio() {
           <label><input type="checkbox" checked={showPhonetics} onChange={e => setShowPhonetics(e.target.checked)} />{c("Show draft Qālūn phonetics", "أظهر النقل الصوتي التجريبي لقالون")}</label>
           <label><input type="checkbox" checked={showTajweed} onChange={e => setShowTajweed(e.target.checked)} />{c("Draft tajweed colors", "ألوان التجويد التجريبية")}</label>
           <span role="status">{c(recitation.connection, active ? "الجلسة متصلة؛ راقب حالة الخادم" : "جاهز")}</span></section>
-        {showTajweed && !tajweed && <p role="status">{tajweedError ? c("Tajweed file unavailable. Run build_qalon_tajweed.py; canonical text is unchanged.", "ملف التجويد غير متاح. شغّل مولّد التجويد؛ النص الأصلي لم يتغير.") : c("Loading reviewable annotations…", "جارٍ تحميل العلامات للمراجعة…")}</p>}
+        {showTajweed && !tajweed && <p role="status">{tajweedError ? c("Tajweed file unavailable. It is generated when the app server first starts; reload in a moment, or run src/learning/build_qalon_tajweed.py. Canonical text is unchanged.", "ملف التجويد غير متاح. يُنشأ تلقائيًا عند أول تشغيل للخادم؛ أعد تحميل الصفحة بعد لحظة. النص الأصلي لم يتغير.") : c("Loading reviewable annotations…", "جارٍ تحميل العلامات للمراجعة…")}</p>}
         <div className="studio-grid">
           <aside className="commentary-sidebar" dir={lang === "ar" ? "rtl" : "ltr"} aria-label={c("Translation and tafsir", "الترجمة والتفسير")}>
             <div className="section-heading"><h2>{c("Translation & tafsir", "الترجمة والتفسير")}</h2><span className="mini-pill">{place ?? "—"}</span></div>

@@ -82,3 +82,5 @@ html[dir="rtl"] .studio-shell .eyebrow{letter-spacing:0}
   .studio-shell .text-mushaf .text-ayah{padding-inline:4px}
   .tajweed-legend .tajweed-palette{grid-template-columns:1fr}
 }
+.reader-audio-note{display:inline-flex;align-items:center;gap:6px}.ayah-listen small.reader-audio-note{color:var(--muted)}
+.reader-audio-ask{display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:420px}.reader-audio-ask .btn-quiet{font-size:12px;padding:7px 12px}

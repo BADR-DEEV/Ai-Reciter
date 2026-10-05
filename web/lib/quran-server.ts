@@ -33,6 +33,8 @@ export function loadCorpus(reciter: ReciterID = DEFAULT_RECITER) {
   if (!texts) texts = Promise.all(Array.from({ length: 114 }, (_, i) => readFile(path.join(publicRoot, "surahs", `${String(i + 1).padStart(3, "0")}.json`), "utf8").then(text => JSON.parse(text) as Surah))).catch(error => { texts = null; throw error; });
   if (!corpusCache.has(reciter)) corpusCache.set(reciter, texts.then(async surahs => {
     const rows = await audioRows(reciter);
+    // Recordings may still be downloading (lib/reader-audio.ts); don't cache an audio-less corpus forever.
+    if (!rows.size) queueMicrotask(() => corpusCache.delete(reciter));
     return corpusVerses(surahs).map(v => {
       const row = rows.get(`${v.surah}:${v.ayah}`);
       return row && row.text_asr_normalized === v.normalized ? { ...v, audio: referenceURL(v.surah, v.ayah, reciter), duration: (row.end_time - row.start_time) / 1000 } : v;

@@ -61,6 +61,8 @@ deployable_*/
 # 2. Datasets & Audio Files (Too large for GitHub)
 # =====================================================================
 dataset_qaloon_*/
+# Symlinks to the Hugging Face copy (src/deployment/pull_hf_assets.py)
+dataset_qaloon_*
 data/
 datasets/
 raw_audio/

@@ -10,6 +10,9 @@ Whisper model in `runs/gpu_base_full`. Includes live microphone streaming and a
 
 ## Start
 
+**Local setup (model v3 + datasets from Hugging Face, dev mode):** see
+[`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md).
+
 **Reviewers:** see [`docs/REVIEWER_GUIDE.md`](docs/REVIEWER_GUIDE.md) for active
 entry points, setup/check commands and release gates.
 

@@ -6,6 +6,8 @@ ROOT = Path(__file__).resolve().parents[2]
 MODEL_PRESETS = {
     "deepdml": ROOT / "runs/deepdml_qaloon_lora_base_v1/adapter",
     "gpu-full-base": ROOT / "runs/gpu_base_full",
+    # Full fine-tune pulled by src/deployment/pull_hf_assets.py (Mathani-Ayat/rattil-qaloon-v3).
+    "rattil-v3": ROOT / "runs/rattil_qaloon_v3",
 }
 
 
@@ -28,5 +30,5 @@ def select_model(preset, path=None):
         if not configuration.get("base_model_name_or_path", "").startswith("deepdml/"):
             raise ValueError("The selected adapter is not a DeepDML adapter.")
     elif adapter.is_file() or not (selected / "config.json").is_file():
-        raise ValueError("gpu-full-base requires a full saved Whisper model, not a LoRA adapter.")
+        raise ValueError(f"{preset} requires a full saved Whisper model, not a LoRA adapter.")
     return selected

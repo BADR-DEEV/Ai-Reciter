@@ -34,6 +34,9 @@ class ModelSelectionTests(unittest.TestCase):
             select_model("deepdml", self.full)
         with self.assertRaisesRegex(ValueError, "missing"):
             select_model("deepdml", self.root / "missing")
+        self.assertEqual(select_model("rattil-v3", self.full), self.full)
+        with self.assertRaises(ValueError):
+            select_model("rattil-v3", self.adapter)
 
     def test_launcher_sets_explicit_selection_before_single_worker_start(self):
         with patch.dict(os.environ, {"RECITER_NUM_BEAMS": "5"}), patch("uvicorn.run") as run:

@@ -84,7 +84,7 @@ def cache_page(url):
 def load_hafs_reference():
     path = PUBLIC / "hafs-reference.json"
     if not path.exists():
-        atomic_json(path, get("https://raw.githubusercontent.com/risan/quran-json/main/dist/quran.json").json())
+        atomic_json(path, get("https://cdn.jsdelivr.net/npm/quran-json@3.1.2/dist/quran.json").json())
     return json.loads(path.read_text(encoding="utf-8"))
 
 

@@ -4,6 +4,7 @@ import { Loader2, Mic2, Square } from "lucide-react";
 import { playUrl, stopAudio } from "@/lib/learn/speech";
 import { referenceURL, RECITERS, type ReciterID } from "@/lib/reciters";
 import { useLang } from "@/lib/i18n";
+import { ReaderAudioNotice } from "@/components/reader-audio-notice";
 import { validTimings, wordAtTime, type PlaybackCursor, type PlaybackTiming } from "@/lib/playback";
 export function AyahListen({ surah, ayah, reciter, disabled = false, displayText, onPlayback }: { surah: number; ayah: number; reciter: ReciterID; disabled?: boolean; displayText?: string; onPlayback?: (ayah: number, cursor: PlaybackCursor | null) => void }) {
   const { lang, c } = useLang();
@@ -35,7 +36,7 @@ export function AyahListen({ surah, ayah, reciter, disabled = false, displayText
     if (version.current === token) { playing.current = false; callback.current?.(ayah, null); setState(result === "failed" ? "failed" : "idle"); }
   }}>{state === "loading" ? <Loader2 size={16} className="spin" /> : state === "playing" ? <Square size={15} /> : <Mic2 size={17} />}
     {state === "loading" ? c("Loading…", "جارٍ التحميل…") : state === "playing" ? c("Stop", "إيقاف") : c(`Listen · ${name}`, `استمع · ${name}`)}</button>
-    {state === "failed" && <small role="alert">{c("This reader’s aligned ayah clip is unavailable. Choose another reader; no audio was substituted.", "لا يتوفر مقطع مواءَم لهذه الآية بصوت القارئ. اختر قارئًا آخر؛ لم نستبدل الصوت.")}</small>}
+    {state === "failed" && <ReaderAudioNotice reciter={reciter} />}
     {state === "playing" && <small className="playback-tracking" role="status">{tracking === "word" ? c("Word tracking · machine timing draft", "متابعة الكلمات · توقيت آلي تجريبي") : c("Ayah tracking · word timings unavailable", "متابعة الآية · توقيت الكلمات غير متاح")}</small>}
   </div>;
 }
