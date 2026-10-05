@@ -1,0 +1,60 @@
+/* /tajweed: letter sounds, rules and Qālūn's riwāyah topics. */
+.tajweed-page{max-width:1080px;margin:0 auto;padding:32px 24px 0;color:var(--ink);line-height:1.7}
+.tj-hero{padding:8px 0 24px}
+.tj-hero h1{font-size:30px}
+.tj-hero p{font-size:14px;color:#5f6b62;max-width:760px;margin-top:8px}
+.tj-jump{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.tj-jump a{border:1px solid var(--line);background:#fff;border-radius:20px;padding:6px 14px;font-size:13px;color:var(--green)}
+.tj-jump a:hover{background:var(--mint)}
+.tj-section{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:20px;scroll-margin-top:16px}
+.tj-section h2{font-family:'Manrope',sans-serif;font-size:20px;color:var(--deep);margin-bottom:6px}
+.tj-lead{font-size:13px;color:#5f6b62;margin-bottom:14px}
+.tj-letter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:8px;direction:rtl}
+.tj-letter-grid button{display:flex;flex-direction:column;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 2px;background:var(--paper)}
+.tj-letter-grid button span{font:30px/1.4 'Amiri',serif;color:var(--deep)}
+.tj-letter-grid button small{font-size:10px;color:var(--muted);direction:ltr}
+.tj-letter-grid button.chosen{border-color:var(--green);background:var(--mint);box-shadow:0 0 0 2px #17634b22}
+.tj-letter-card{display:flex;gap:20px;align-items:flex-start;margin-top:16px;padding:16px;border-radius:12px;background:var(--paper);border:1px solid #e8e4d5}
+.tj-letter-big{font:72px/1.2 'Amiri',serif;color:var(--deep);min-width:90px;text-align:center}
+.tj-letter-card h3{font-size:16px;margin-bottom:4px}
+.tj-letter-card p{font-size:13px;margin:2px 0}
+.tj-chips{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:10px 0 0}
+.tj-chips li{font-size:12px;background:var(--mint);color:var(--deep);border-radius:12px;padding:2px 10px;cursor:help}
+.tj-places{margin-top:12px;font-size:13px}
+.tj-places summary{cursor:pointer;color:var(--green);font-weight:600}
+.tj-places h4{font-size:13px;margin:12px 0 4px;color:var(--deep)}
+.tj-places ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:4px}
+.tj-places li{display:flex;gap:12px;align-items:baseline}
+.tj-place-letters{font:22px/1.5 'Amiri',serif;color:var(--deep);min-width:120px;direction:rtl;text-align:center}
+.tj-group{margin-top:18px}
+.tj-group h3{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--deep);border-bottom:1px solid var(--line);padding-bottom:6px}
+.tj-group h3 i{width:14px;height:14px;border-radius:4px}
+.tj-group ul{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-direction:column;gap:12px}
+.tj-group li{scroll-margin-top:16px}
+.tj-group li p{font-size:13px;margin:2px 0;color:#4a564d}
+.tj-rule-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}
+.tj-rule-head [lang="ar"]{font:18px/1.4 'Amiri',serif;color:#5f6b62}
+.tj-page{font-size:11px;color:var(--muted)}
+.tj-wajh{font-size:12px;color:#5a4a00!important}
+.tj-examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.tj-examples a,.tj-found a{display:inline-flex;align-items:baseline;gap:6px;border:1px solid #e8e4d5;background:var(--paper);border-radius:8px;padding:0 10px}
+.tj-examples a:hover,.tj-found a:hover{border-color:var(--green)}
+.tj-example{font:28px/1.9 'Amiri',serif;color:var(--ink)}
+.tj-examples small,.tj-found small{font-size:10px;color:var(--muted)}
+.tj-topic{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:10px;background:var(--paper);scroll-margin-top:16px}
+.tj-topic summary{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:14px;color:var(--deep)}
+.tj-topic summary svg{color:var(--tj-riwaya,#7a1fbf)}
+.tj-topic-ar{font:19px/1.4 'Amiri',serif;font-weight:400;color:#5f6b62}
+.tj-topic summary .mini-pill{margin-inline-start:auto;font-size:10px}
+.tj-topic>p{font-size:13px;margin:10px 0 4px}
+.tj-points{font-size:13px;margin:4px 0;padding-inline-start:20px}
+.tj-found h4{font-size:12px;color:var(--muted);margin:10px 0 6px}
+.tj-found>div{display:flex;flex-wrap:wrap;gap:6px;max-height:260px;overflow:auto}
+.tj-found a span{font:22px/1.8 'Amiri',serif;color:var(--tj-riwaya,#7a1fbf)}
+@media(max-width:760px){
+  .tajweed-page{padding:20px 16px 0}
+  .tj-section{padding:16px}
+  .tj-letter-card{flex-direction:column;gap:6px}
+  .tj-letter-big{font-size:56px;min-width:0}
+  .tj-place-letters{min-width:84px;font-size:19px}
+}

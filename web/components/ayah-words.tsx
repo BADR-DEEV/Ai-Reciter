@@ -1,19 +1,41 @@
+import { memo } from "react";
 import type { Ayah, Result } from "@/lib/types";
-import { tajweedSegments, type TajweedAyah, type TajweedMushaf } from "@/lib/tajweed";
+import { visibleRules, wordText, type Segment, type TajweedAyah, type TajweedRules, type TajweedSettings } from "@/lib/tajweed";
+import { missedByWord, type TajweedFeedback } from "@/components/tajweed-feedback";
 
-export function AyahWords({ ayah, result, tajweed, rules, lang = "en", activeWord = null }: { ayah: Ayah; result?: Result; tajweed?: TajweedAyah; rules?: TajweedMushaf["rules"]; lang?: "en" | "ar"; activeWord?: number | null }) {
-  const source = (ayah.displayText || ayah.text).replace(/[\u0660-\u0669\d]+/g, "").trim();
-  // Stale/generated annotations may never replace Quran text or color the wrong
-  // code points. A different display spelling requires regenerated offsets.
-  const annotation = tajweed?.text === source ? tajweed : undefined;
-  const displayWords = [...source.matchAll(/\S+/g)];
-  return <>{displayWords.map((match, index) => {
-    const text = match[0];
+type Props = {
+  ayah: Ayah; result?: Result; tajweed?: TajweedAyah | { w: Segment[][] }; rules?: TajweedRules | null; settings?: TajweedSettings;
+  feedback?: TajweedFeedback; lang?: "en" | "ar"; activeWord?: number | null;
+};
+
+/** Words of an ayah. With generated tajweed data the text is the full Qālūn
+ *  spelling (ṣilah, iqlāb mīm, tas-hīl dots); colours only change `color` on
+ *  inline spans inside a word, so Arabic shaping and word widths are kept. */
+function Words({ ayah, result, tajweed, rules, settings, feedback, lang = "en", activeWord = null }: Props) {
+  const fallback = (ayah.displayText || ayah.text).replace(/[٠-٩\d]+/g, "").trim().split(/\s+/).map(w => [[w]] as Segment[]);
+  const words = tajweed?.w.length === fallback.length ? tajweed.w : fallback;
+  const colored = Boolean(settings?.show && rules && words !== fallback);
+  const missed = missedByWord(feedback);
+  return <>{words.map((segments, index) => {
     const word = result?.words?.[index];
     const status = word?.status || "pending";
     const label = lang === "ar" ? status === "correct" ? "مطابق للنص" : status === "missed" ? "لم يطابق النص" : "لم تصل إليه" : status === "correct" ? "Matched" : status === "missed" ? "Omitted / not matched" : "Not reached";
-    return <span key={index}><span className={`quran-word ${status} ${annotation ? "tajweed-word" : ""} ${activeWord === index ? "playback-word" : ""}`} data-word-index={index} aria-current={activeWord === index ? "true" : undefined} data-status={status} title={`${label}${word?.heard ? ` · ${word.heard}` : ""}`}>
-      {annotation && rules ? tajweedSegments(source, annotation.spans, match.index!, match.index! + text.length).map((piece, i) => <span key={i} className={piece.rules.length ? "tajweed-span" : ""} style={{ color: piece.rules.length ? rules[piece.rules[0]]?.color : undefined }} title={piece.rules.map(id => rules[id]?.[lang] || id).join(" · ")}>{piece.text}</span>) : text}
+    const misses = missed.get(index);
+    return <span key={index}><span className={`quran-word ${status} ${colored ? "tajweed-word" : ""} ${activeWord === index ? "playback-word" : ""}`} data-word-index={index} aria-current={activeWord === index ? "true" : undefined} data-status={status} title={`${label}${word?.heard ? ` · ${word.heard}` : ""}`}>
+      {colored ? segments.map((segment, i) => {
+        const shown = visibleRules(segment[1], rules!, settings!);
+        if (!shown.length) return segment[0];
+        const miss = misses && segment[1]!.some(r => misses.has(rules!.rules[rules!.order[r]]?.tag || ""));
+        return <span key={i} className={`tajweed-span tj-${rules!.rules[shown[0]].group}${miss ? " tj-miss" : ""}`} data-tj={segment[1]!.join(",")} data-w={index}>{segment[0]}</span>;
+      }) : wordText(segments)}
     </span>{" "}</span>;
   })}</>;
 }
+
+// Live recitation sends fresh result objects for every ayah on each update;
+// only re-render an ayah when what it shows actually changed.
+const resultKey = (r?: Result) => r?.words?.map(w => `${w.status}:${w.heard || ""}`).join("|") || "";
+const feedbackKey = (f?: TajweedFeedback) => f?.words.map(w => `${w.word}:${w.missed.join(",")}`).join("|") || "";
+export const AyahWords = memo(Words, (a, b) => a.ayah === b.ayah && a.tajweed === b.tajweed && a.rules === b.rules
+  && a.settings === b.settings && a.lang === b.lang && a.activeWord === b.activeWord
+  && resultKey(a.result) === resultKey(b.result) && feedbackKey(a.feedback) === feedbackKey(b.feedback));

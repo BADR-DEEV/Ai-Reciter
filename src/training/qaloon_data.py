@@ -8,12 +8,37 @@ from pathlib import Path
 
 
 DATA_ROOT = Path(__file__).resolve().parents[1] / "dataset_collection"
+HUB_DATA_ROOT = Path(__file__).resolve().parents[2] / "data/hf/qaloon-reciter-dataset"
 RECITER_DIRS = {
     "huthaify": "dataset_qaloon_hutafi",
     "husary": "dataset_qaloon_Husary",
     "dokali": "dataset_qaloon_dokali",
     "waleed": "dataset_qaloon_waleed",
 }
+
+
+def default_data_root():
+    """src/dataset_collection (pull_hf_assets.py symlinks readers there), else the Hub copy under data/hf."""
+    for root in (DATA_ROOT, HUB_DATA_ROOT):
+        if (root / RECITER_DIRS["huthaify"] / "metadata.jsonl").is_file():
+            return root
+    return DATA_ROOT
+
+
+def register_reader_root(root):
+    """Register every <root>/dataset_qaloon_<name>/metadata.jsonl as reciter <name> (known folders keep their key).
+
+    Absolute folders win over --data-root in load_splits, e.g. data/hf/qaloon-new-reciters.
+    """
+    known = {Path(folder).name: key for key, folder in RECITER_DIRS.items()}
+    added = {}
+    for metadata in sorted(Path(root).glob("dataset_qaloon_*/metadata.jsonl")):
+        folder = metadata.parent
+        key = known.get(folder.name, folder.name.removeprefix("dataset_qaloon_").lower())
+        RECITER_DIRS[key] = added[key] = str(folder.resolve())
+    if not added:
+        raise ValueError(f"No dataset_qaloon_*/metadata.jsonl reader folders under {root}")
+    return added
 
 
 def selected_reciters(include, exclude):

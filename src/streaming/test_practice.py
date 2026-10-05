@@ -36,5 +36,10 @@ class PracticeTests(unittest.TestCase):
         self.assertEqual(practice.assess_reading("قُلْ", "")["verdict"], "other")
 
 
+    def test_reading_carries_heard_tajweed_tags(self):
+        result = practice.assess_reading("قُلْ هُوَ اَ۬للَّهُ أَحَدٌۖ", "قل هو احد", [["qalqala"], [], ["qalqala"]])
+        self.assertEqual([w.get("tags") for w in result["words"]], [["qalqala"], None, None, ["qalqala"]])
+        self.assertNotIn("tags", practice.assess_reading("قُلْ", "قل", [["x"], []])["words"][0])
+
 if __name__ == "__main__":
     unittest.main()

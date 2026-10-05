@@ -25,7 +25,7 @@ export default async function DevPage() {
     <section className="dev-card">
       <h2><span className={`dev-dot ${service.data ? "ok" : "bad"}`} /> Inference service</h2>
       <p className="dev-sub"><code>{service.url}/health</code></p>
-      {service.data ? <dl className="dev-grid">{Object.entries(service.data).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v === null ? "—" : String(v)}</dd></div>)}</dl>
+      {service.data ? <dl className="dev-grid">{Object.entries(service.data).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v === null ? "—" : Array.isArray(v) ? v.map(m => m && typeof m === "object" ? `${m.name} (${m.kind}, ${m.loaded ? "loaded" : m.available ? "on disk" : "missing"})` : String(m)).join(" · ") : typeof v === "object" ? JSON.stringify(v) : String(v)}</dd></div>)}</dl>
         : <p className="dev-warn">Offline ({service.error}). Start it from the repo root: <code>python -m src.streaming.serve --model gpu-full-base</code></p>}
     </section>
 

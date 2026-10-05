@@ -1,6 +1,7 @@
 import unittest
 
-from .matcher import RecitationTracker, alignment
+from .matcher import RecitationTracker, alignment, words
+from .tajweed_tags import strip_tags, tagged_words
 
 
 def tracker(*texts):
@@ -184,6 +185,28 @@ class MatcherTests(unittest.TestCase):
         result = t.feed("الحمد لله رب")
         self.assertEqual(result["results"][1]["words"][1]["status"], "correct")
 
+
+    def test_tags_never_change_matching(self):
+        tagged = "قل<tj:qalqala> هو الله<tj:tafkheem> احد<tj:qalqala> الله الصمد"
+        self.assertEqual(words(tagged), words(strip_tags(tagged)))
+        plain = tracker("قل هو الله احد", "الله الصمد").feed(strip_tags(tagged), final=True, continuous=True)
+        raw = tracker("قل هو الله احد", "الله الصمد").feed(tagged, final=True, continuous=True)
+        self.assertEqual(raw["results"], plain["results"])
+        self.assertEqual(plain["current"], None)
+
+    def test_feed_reports_heard_tags_on_matched_words_only(self):
+        tagged = "بسم الله الرحمن الرحيم الحمد<tj:x> لله رب<tj:qalqala> العالمين<tj:madd_aarid> الرحمن"
+        heard, tags = tagged_words(tagged, words)
+        t = RecitationTracker([{"ayah": 1, "normalized": "الحمد لله رب العالمين"}, {"ayah": 2, "normalized": "الرحمن الرحيم"}], surah=1)
+        untagged = RecitationTracker(t.ayahs, surah=1).feed(" ".join(heard), final=True)
+        update = t.feed(" ".join(heard), final=True, tags=tags)
+        self.assertEqual([w.get("tags") for w in update["results"][1]["words"]], [["x"], None, ["qalqala"], ["madd_aarid"]])
+        self.assertEqual(t.tagged_spans[1], (["الحمد", "لله", "رب", "العالمين"], [["x"], [], ["qalqala"], ["madd_aarid"]]))
+        for result in update["results"][1]["words"]:
+            result.pop("tags", None)
+        self.assertEqual(update["results"], untagged["results"])
+        # Misaligned tags are ignored rather than shifted onto the wrong words.
+        self.assertNotIn("tags", RecitationTracker(t.ayahs).feed("الحمد لله", tags=[["x"]])["results"][1]["words"][0])
 
 if __name__ == "__main__":
     unittest.main()

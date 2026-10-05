@@ -182,10 +182,13 @@ Local audio/listening defaults to the existing Huthaify dataset; no Hafs recordi
 substituted. Without the generated index, difficulty explicitly falls back to
 text similarity. MFCC similarity is a heuristic, not a phoneme/tajweed model.
 Alternate indexes: `--reciter husary` / `--reciter dokali` with the matching datasets.
-The generated `web/public/quran/qalon_majwad_mushaf.json` covers all source ayahs,
-but is **unapproved machine candidates**, not a certified mushaf. Natural madd is
-**2 ḥarakāt**, necessary madd **6**, not fixed seconds; other choices require
-route/context review. Colors are off by default. See the reviewer guide.
+Tajweed colors come from the Qālūn rule engine in `src/tajweed` (rules from the Libyan
+Awqaf curriculum on tajweed and the uṣūl of Qālūn's riwāyah). `python -m src.tajweed.build`
+writes one small file per surah to `web/public/quran/tajweed/`; the first app start does it
+automatically. Rules are machine-applied, not a certified mushaf: counts are ḥarakāt (natural 2,
+muttaṣil 4, munfaṣil 2/4, lāzim 6). The `/tajweed` page teaches letter sounds, every rule and
+Qālūn's riwāyah topics, and the studio's "Check my ahkam" switch uses the tajweed model when
+it is installed. Details: [`docs/QALOON_TAJWEED.md`](docs/QALOON_TAJWEED.md).
 
 New-reader collection/segmentation and restrictions:
 [`docs/AUDIO_SEGMENTATION_REVIEW.md`](docs/AUDIO_SEGMENTATION_REVIEW.md).

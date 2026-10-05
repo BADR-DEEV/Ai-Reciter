@@ -33,9 +33,9 @@ from English translation of meanings; neither replaces canonical Qālūn text.
 
 ## Generated/private files: do not publish automatically
 
-- `web/public/quran/`: local Quran cache, per-reciter similarity indexes and
-  **`qalon_majwad_mushaf.json`**. Rebuild using commands below; this directory is
-  Git-ignored. The name requested by the product does **not** confer certification.
+- `web/public/quran/`: local Quran cache, per-reciter similarity indexes and the
+  generated tajweed data in **`tajweed/`** (`python -m src.tajweed.build`). This directory
+  is Git-ignored. Machine-applied rules do **not** make it a certified mushaf.
 - `data/review_sources/`: restricted source audio/inventories; Git-ignored and
   completely separate from `dataset_qaloon_*` used by training/reference playback.
 - `runs/`: existing model experiments; do not delete or rerun as a setup step.
@@ -71,43 +71,25 @@ npx.cmd playwright test
 
 ## Tajweed release gate — currently NOT met
 
-Generated for all **6,210 source ayahs**, but **zero teacher approvals**.
-Offsets use UTF-16 for browser slices; source text remains unchanged. Spans carry
-`needs-review`, and the UI is opt-in with explicit limitations.
-Spans address the existing simplified `displayText`, with original `source_text`
-preserved separately; matching text is checked before any colors are applied.
-Display typography does not preserve enough notation for complete tajweed inference.
+The engine in `src/tajweed` annotates all **6,210 Qālūn ayahs** from the real KFGQPC Qālūn
+text (not the simplified display text), with rules and page references from the Libyan Awqaf
+curriculum «المنهج العلمي في أحكام التجويد وأصول رواية الإمام قالون» (2nd ed., 2022). There are
+still **zero teacher approvals**: every color is machine-applied.
 
-- Natural madd: **2 ḥarakāt**, necessary madd: **6**. Not 4/6 fixed seconds.
-- The current draft lists **Shāṭibiyyah** options: ordinary unchanged connected
-  madd **4**, separate madd **2 or 4**, with consistent performance choices.
-  Changed adjacent hamzas are flagged separately, without an unconditional count.
-  Other routes/combinations are not inferred. The supplied Scribd link served a
-  client challenge and could not be read; the public secondary reference
-  *The Secure Way to Rewayat Qalun*, pp. 8–14 and 18–22, was consulted instead.
-  Uploading the supplied document is still necessary for exact-source review.
-- Context is joined words *within an ayah*, stopping at its end. It does not model
-  arbitrary internal waqf or joining across ayahs. Pause-induced madd has 2/4/6 options.
-- The sample image guides the grouped palette, **not** its recitation-specific
-  durations: purple necessary madd, pink ordinary connected madd, amber permitted
-  madd, gold natural madd, green nasalization/ikhfa/iqlab, gray merged/silent
-  letters, blue-teal tafkhim, cyan qalqalah. The bilingual key appears below the
-  reader, with expandable rule/context notes and letter tooltips. Basmalah also
-  receives text-preserving annotations. Source silent marks are used only when
-  source/display base-letter sequences match exactly.
-- Color spans inherit the surrounding font/weight and remain inline; no inserted
-  joining characters or rewritten Quran text. Browser regression checks compare
-  word text, font runs and widths before/after coloring, including Arabic/mobile.
-- No comprehensive claims for mīm al-jam, pronoun ṣilah, hamza variants, contextual
-  rā/Allah-lām heaviness, small-letter spellings, or disjoint-letter rules.
+- Qālūn counts (ṭarīq al-Shāṭibiyyah): natural 2, muttaṣil 4 (4 or 6 when stopping on the
+  hamza), munfaṣil 2 or 4, badal 2, lāzim 6, ʿāriḍ/līn 2/4/6. Optional ways are shown as
+  options, never as one fixed count.
+- Riwāyah points (mīm al-jamʿ, tas-hīl/idkhāl, isqāṭ, ibdāl, naql, ḥadhf, imāla of هار,
+  taqlīl of التوراة, ishmām, ikhtilās, the eight short pronoun-hā words, yāʾāt) and word-level
+  differences from Ḥafṣ are flagged in purple with a dotted underline.
+- Context is waṣl inside the ayah and waqf at its end; internal waqf and joining ayahs are not
+  modeled. Rawm/ishmām at waqf are explained, not marked.
+- Color spans never split a letter from its marks, lām-alif or the Allāh ligature, and only
+  change `color`; Playwright compares word text, font runs and widths with colors on and off.
 - Speech-match **backgrounds** are independent of tajweed **letter colors**.
-- SVG artwork is the previously supplied Hafs-numbered artwork, text-aligned for
-  regions; it is **not** a verified Qālūn mujawwad mushaf.
 
-Qualified review must select a tariq, check every annotated ayah against an
-authorized Qālūn source and recordings, resolve overlap/context behavior, and
-record reviewer/source/version outside regenerated drafts before a certified release.
-Regenerating the JSON replaces machine drafts, not a teacher-review workflow.
+A qualified Qālūn reviewer should check annotated ayahs against an authorized muṣḥaf and
+recordings before any claim of certification. See [`QALOON_TAJWEED.md`](QALOON_TAJWEED.md).
 
 ## Color/joining and slicer verification — 2026-10-04
 

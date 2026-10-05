@@ -73,6 +73,8 @@ async function models(): Promise<ModelEntry[]> {
     await fullModel("rattil-v3", path.join(ROOT, "runs/rattil_qaloon_v3"), "Full fine-tune · recommended",
       "Hugging Face Mathani-Ayat/rattil-qaloon-v3@e9e59ac (src/deployment/pull_hf_assets.py)",
       "Waleed (held-out voice): 2.2% WER normal speed · 13.4% at 1.25× · 21.2% at 1.5× (model card)"),
+    await fullModel("rattil-tajweed-v1", path.join(ROOT, "runs/rattil_qaloon_tajweed_v1"), "Tajweed-tagged full fine-tune · ahkam check",
+      "Trained locally: python -m src.tajweed.targets, then train_base_full.py (docs/QALOON_TAJWEED.md)"),
     await fullModel("gpu-full-base", path.join(ROOT, "runs/gpu_base_full"), "Full fine-tune · original team model",
       release ? `Hugging Face ${release.repo_id}@${release.commit.slice(0, 7)} (src/deployment/restore_local_full.py)` : "Hugging Face release"),
     {
@@ -112,7 +114,7 @@ async function data(): Promise<DataEntry[]> {
     dirEntry("Quran text", "Page geometry", path.join(pub, "geometry"), /\.json$/, "cache script (merged into surahs/*.json)", `${cache} ← mp3quran.net`),
     fileEntry("Quran text", "Hafs numbering reference", path.join(pub, "hafs-reference.json"), "cache script (numbering alignment only)", "quran-json (jsdelivr mirror)"),
     fileEntry("Quran text", "Qālūn ↔ Hafs text mapping", path.join(pub, "text-mapping.json"), "cache script", cache),
-    fileEntry("Learning", "Tajweed draft", path.join(pub, "qalon_majwad_mushaf.json"), "/api/tajweed", "src/learning/build_qalon_tajweed.py"),
+    dirEntry("Learning", "Qālūn tajweed (rules + per-surah text)", path.join(pub, "tajweed"), /\.json$/, "Studio reader & /tajweed (browser fetch /quran/tajweed)", "python -m src.tajweed.build"),
     fileEntry("Learning", "Ayah & word embeddings", path.join(pub, "text-embeddings.json"), "/api/challenges (falls back to spelling similarity)", "src/learning/build_text_embeddings.py ← runs/rattil_ayah_embed or Hugging Face", async b => {
       const m = await json<{ model?: string; ayahs?: { ids?: unknown[] }; words?: { keys?: unknown[] } }>(path.join(pub, "text-embeddings.json"));
       return `${m?.model ?? "?"} · ${m?.ayahs?.ids?.length ?? "?"} ayahs · ${m?.words?.keys?.length ?? "?"} words · ${mb(b)}`;
