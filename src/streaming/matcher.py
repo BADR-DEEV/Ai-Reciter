@@ -9,11 +9,13 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "dataset_collection"))
 from qaloon_audio2text import normalize_quran_for_asr
+from .tajweed_tags import strip_tags
 
 
 @lru_cache(maxsize=512)
 def _words(text):
-    return tuple(normalize_quran_for_asr(text).split())
+    # Tajweed tags are not letters; the normalizer would leave their pieces as words.
+    return tuple(normalize_quran_for_asr(strip_tags(text)).split())
 
 
 def words(text):
@@ -65,6 +67,7 @@ class RecitationTracker:
         self.has_advanced = False
         self.context_limit = context_limit
         self.uncertain_audio = False
+        self.tagged_spans = {}
 
     @property
     def done(self):
@@ -88,7 +91,7 @@ class RecitationTracker:
         missing = [word for i, word in enumerate(expected) if i not in {p[0] for p in pairs}]
         return score, terminal, end_pair, missing, pairs
 
-    def word_results(self, index, heard, pairs, completed=False, boundary=False):
+    def word_results(self, index, heard, pairs, completed=False, boundary=False, tags=None):
         expected = words(self.ayahs[index]["normalized"])
         ayah = self.ayahs[index]["ayah"]
         matched = dict(pairs)
@@ -114,21 +117,26 @@ class RecitationTracker:
             word = {"index": i, "text": text, "status": status}
             if i in matched:
                 word["heard"] = heard[matched[i]]
+                if tags and tags[matched[i]]:
+                    word["tags"] = list(tags[matched[i]])
             results.append(word)
         return results
 
     def clear_context(self):
         self.completed_context = []
 
-    def feed(self, transcript, final=False, continuous=False, stable_prefix=0):
+    def feed(self, transcript, final=False, continuous=False, stable_prefix=0, tags=None):
+        """`tags` (optional) lists each word's tajweed tags, aligned with words(transcript)."""
         self.tentative_prefix = False
         if self.done:
             return self.snapshot(transcript)
         heard = words(transcript)
+        tags = list(tags) if tags is not None and len(tags) == len(heard) else None
         if self.surah == 1 and self.index == 0:
             intro = words("بسم الله الرحمن الرحيم")
             if heard[:len(intro)] == intro:
                 heard = heard[len(intro):]
+                tags = tags and tags[len(intro):]
                 stable_prefix = max(0, stable_prefix - len(intro))
         original = heard[:]
         consumed = 0
@@ -141,6 +149,7 @@ class RecitationTracker:
                     and context_pairs[-1][0] == len(self.completed_context) - 1):
                 consumed = context_pairs[-1][1] + 1
                 heard = heard[consumed:]
+                tags = tags and tags[consumed:]
                 stable_prefix = max(0, stable_prefix - consumed)
         if not heard:
             return self.snapshot(transcript)
@@ -203,17 +212,20 @@ class RecitationTracker:
             self.results[ayah] = {"status": "correct" if score >= self.threshold else "listening",
                                   "score": round(score, 3), "missing": missing, "final": False,
                                   "words": self.word_results(self.index, heard, pairs,
-                                                             completed=terminal and stable, boundary=final)}
+                                                             completed=terminal and stable, boundary=final, tags=tags)}
             if terminal and stable:
                 self.results[ayah].update(status="correct" if score >= self.threshold else "listening" if self.uncertain_audio else "missed", final=True)
                 self.index += 1
                 changed = True
                 self.has_advanced = True
                 consumed += end + 1
+                if tags is not None:
+                    self.tagged_spans[ayah] = (heard[:end + 1], tags[:end + 1])
                 if continuous:
                     # Bound matcher history to the rolling ASR context.
                     self.completed_context = original[:consumed][-self.context_limit:]
                 heard = heard[end + 1:]
+                tags = tags and tags[end + 1:]
                 stable_prefix = max(0, stable_prefix - end - 1)
                 self.last_candidate, self.stability = None, 0
             else:

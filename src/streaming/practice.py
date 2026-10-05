@@ -76,12 +76,19 @@ def assess_sound(candidates, target, logprobs, transcript):
             "probabilities": [round(x, 3) for x in probabilities], "transcript": transcript}
 
 
-def assess_reading(target_text, transcript):
-    """Exact ordered word agreement; not certified learner pronunciation."""
+def assess_reading(target_text, transcript, heard_tags=None):
+    """Exact ordered word agreement; not certified learner pronunciation.
+
+    `heard_tags` (tajweed model) lists each heard word's tags; matched words carry them.
+    """
     expected, heard = words(target_text), words(transcript)
     matched = {i: j for i, j in alignment(expected, heard)}
     statuses = [{"index": i, "text": w, "status": "correct" if i in matched else "missed",
                  "heard": heard[matched[i]] if i in matched else None} for i, w in enumerate(expected)]
+    if heard_tags is not None and len(heard_tags) == len(heard):
+        for status in statuses:
+            if status["index"] in matched and heard_tags[matched[status["index"]]]:
+                status["tags"] = list(heard_tags[matched[status["index"]]])
     score = len(matched) / len(expected) if expected else 0.0
     verdict = "correct" if score == 1 else "close" if score >= 0.5 else "other"
     return {"verdict": verdict, "score": round(score, 3), "words": statuses, "transcript": transcript}

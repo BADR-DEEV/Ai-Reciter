@@ -2,14 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Surah, Update } from "./types";
+import type { FallbackReason, ModelName, TaggedUpdate } from "./models";
 
 type State = "idle" | "connecting" | "listening" | "stopping" | "complete";
 type Resources = { socket?: WebSocket; context?: AudioContext; stream?: MediaStream; node?: AudioWorkletNode; source?: AudioNode; playback?: AudioBufferSourceNode; timer?: ReturnType<typeof setInterval>; heartbeat?: ReturnType<typeof setInterval>; stopTimeout?: ReturnType<typeof setTimeout>; flushTimeout?: ReturnType<typeof setTimeout>; finishing?: boolean; upload?: Float32Array; sentSamples?: number; decodedSamples?: number; creditSamples?: number };
 const endpoint = process.env.NEXT_PUBLIC_RECITER_WS || "ws://127.0.0.1:8000/ws/recite";
 
-export function useRecitation(surah: Surah | null, startAyah = 1) {
+type ModelUse = { used: string; kind: ModelName; fallback: FallbackReason | null };
+
+/** `model` picks the engine for the next session (service default when omitted); "tajweed" falls back to plain, see `model.fallback`. */
+export function useRecitation(surah: Surah | null, startAyah = 1, model?: ModelName) {
   const [state, setState] = useState<State>("idle");
-  const [update, setUpdate] = useState<Update | null>(null);
+  const [update, setUpdate] = useState<TaggedUpdate | null>(null);
+  const [modelUse, setModelUse] = useState<ModelUse | null>(null);
   const [error, setError] = useState("");
   const [level, setLevel] = useState(0);
   const [seconds, setSeconds] = useState(0);
@@ -37,7 +42,7 @@ export function useRecitation(surah: Surah | null, startAyah = 1) {
 
   const reset = useCallback(() => {
     generation.current++;
-    release(); setState("idle"); setUpdate(null); setError(""); setLevel(0); setSeconds(0); setDemo(false); setDevice(""); setFileName(""); setConnection("Ready");
+    release(); setState("idle"); setUpdate(null); setModelUse(null); setError(""); setLevel(0); setSeconds(0); setDemo(false); setDevice(""); setFileName(""); setConnection("Ready");
   }, [release]);
 
   useEffect(() => { reset(); return () => { generation.current++; release(); }; }, [surah?.id, startAyah, reset, release]);
@@ -113,7 +118,7 @@ export function useRecitation(surah: Surah | null, startAyah = 1) {
       let ready = false;
       const timeout = setTimeout(() => { if (!ready && generation.current === token) { setError("The model service did not respond. Start the Python backend and try again."); release(); setState("idle"); } }, 15000);
       resources.current.stopTimeout = timeout;
-      socket.onopen = () => socket.send(JSON.stringify({ surah: surah.id, start_ayah: startAyah, input_mode: file ? "file" : "microphone" }));
+      socket.onopen = () => socket.send(JSON.stringify({ surah: surah.id, start_ayah: startAyah, input_mode: file ? "file" : "microphone", model }));
       socket.onmessage = event => {
         if (generation.current !== token) return;
         let message;
@@ -122,6 +127,7 @@ export function useRecitation(surah: Surah | null, startAyah = 1) {
           ready = true; clearTimeout(timeout);
           if (resources.current.finishing) return;
           setDevice(message.device); setState("listening");
+          if (message.model_used) setModelUse({ used: message.model_used, kind: message.model_kind === "tajweed" ? "tajweed" : "plain", fallback: message.fallback_reason ?? null });
           if (source && node) {
             source.connect(node); node.connect(context.destination);
             void context.resume();
@@ -188,7 +194,7 @@ export function useRecitation(surah: Surah | null, startAyah = 1) {
       release(); setState("idle");
       setError(cause instanceof Error ? (cause.name === "NotAllowedError" ? "Microphone permission was denied. Allow access in your browser and try again." : cause.message) : "Could not start recording.");
     }
-  }, [surah, startAyah, reset, release, finish]);
+  }, [surah, startAyah, model, reset, release, finish]);
 
   const stop = useCallback(() => {
     if (demo) { release(); setState("idle"); setLevel(0); return; }
@@ -221,5 +227,5 @@ export function useRecitation(surah: Surah | null, startAyah = 1) {
     }, 650);
   }, [surah, reset, release]);
 
-  return { state, update, error, level, seconds, device, demo, fileName, connection, start, stop, reset, startDemo };
+  return { state, update, error, level, seconds, device, demo, fileName, connection, model: modelUse, start, stop, reset, startDemo };
 }

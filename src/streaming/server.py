@@ -1,11 +1,10 @@
-"""Local PCM/WebSocket inference service for the trained full Whisper base model."""
+"""Local PCM/WebSocket inference service for named Whisper engines (plain and tajweed-tagged)."""
 import asyncio
 import base64
 from contextlib import asynccontextmanager, suppress
 import json
 import logging
 import os
-from pathlib import Path
 import time
 
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -19,12 +18,9 @@ from .matcher import RecitationTracker, words
 from .live_buffer import AudioQueue, TranscriptOverlap
 from . import practice as lessons
 from src.training_with_gpu.decoding_safety import load_private_adapter, generation_diagnostics
-from .model_options import resolve_local_model
+from .model_options import ROOT, ModelSpec, default_name, models_from_env, resolve_local_model
+from .tajweed_tags import TAG, carry_tags, strip_tags, tag_list, tagged_words
 
-ROOT = Path(__file__).resolve().parents[2]
-MODEL_PATH = Path(os.environ.get("RECITER_MODEL_PATH", ROOT / "runs" / "deepdml_qaloon_lora_base_v1"))
-# A missing local directory is treated as a Hugging Face model id (development only).
-LOCAL_MODEL = MODEL_PATH.is_dir()
 ASSETS = ROOT / "web" / "public" / "quran"
 ORIGINS = set(os.environ.get("RECITER_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(","))
 SAMPLE_RATE = 16000
@@ -34,10 +30,11 @@ logger = logging.getLogger("reciter")
 
 
 class Engine:
-    def __init__(self):
-        if MODEL_PATH.is_absolute() and not MODEL_PATH.is_dir():
-            raise RuntimeError(f"Local full model is missing: {MODEL_PATH}. Set RECITER_MODEL_PATH to your verified model directory, or restore the pinned private release with python src/deployment/restore_local_full.py. No automatic model substitution is performed.")
-        self.model_path = resolve_local_model(MODEL_PATH) if LOCAL_MODEL else MODEL_PATH
+    def __init__(self, spec: ModelSpec):
+        if spec.path.is_absolute() and not spec.path.is_dir():
+            raise RuntimeError(f"Local full model is missing: {spec.path}. Set RECITER_MODELS (or RECITER_MODEL_PATH) to your verified model directory, or pull it with python src/deployment/pull_hf_assets.py. No automatic model substitution is performed.")
+        local = spec.local
+        self.model_path = resolve_local_model(spec.path) if local else spec.path
         requested_device = os.environ.get("RECITER_DEVICE", "auto")
         if requested_device not in {"auto", "cuda", "cpu"}:
             raise ValueError("RECITER_DEVICE must be auto, cuda or cpu")
@@ -53,7 +50,9 @@ class Engine:
             raise RuntimeError("BF16 requested but unsupported by this GPU")
         dtype = {"fp16": torch.float16, "bf16": torch.bfloat16, "fp32": torch.float32}[precision]
         self.precision = precision
-        self.model_name = os.environ.get("RECITER_MODEL_PRESET") or (self.model_path.parent.name if self.model_path.name == "adapter" else self.model_path.name)
+        self.model_name = spec.label
+        # Tag tokens lengthen tajweed transcripts; keep provisional decodes from hitting the cap.
+        self.tokens_per_second = 40 if spec.kind == "tajweed" else 25
         self.experimental_adapter = (self.model_path / "adapter_config.json").is_file()
         if self.experimental_adapter:
             if os.environ.get("RECITER_ALLOW_EXPERIMENTAL_ADAPTER") != "1":
@@ -62,15 +61,18 @@ class Engine:
             logger.warning("Private experimental adapter enabled; qualified learner/riwayah validation is not established")
             self.num_beams = self.model.generation_config.num_beams
         else:
-            self.processor = WhisperProcessor.from_pretrained(str(self.model_path), local_files_only=LOCAL_MODEL)
+            self.processor = WhisperProcessor.from_pretrained(str(self.model_path), local_files_only=local)
             self.model = WhisperForConditionalGeneration.from_pretrained(
-                str(self.model_path), local_files_only=LOCAL_MODEL, torch_dtype=dtype).to(self.device).eval()
+                str(self.model_path), local_files_only=local, torch_dtype=dtype).to(self.device).eval()
             self.num_beams = 1
         if os.environ.get("RECITER_NUM_BEAMS") is not None:
             self.num_beams = int(os.environ["RECITER_NUM_BEAMS"])
             if self.num_beams not in {1, 3, 5}:
                 raise ValueError("RECITER_NUM_BEAMS must be 1, 3 or 5")
         self.processor.tokenizer.set_prefix_tokens(language="arabic", task="transcribe")
+        # Tags registered as *special* tokens would vanish with skip_special_tokens; keep them.
+        tokenizer = self.processor.tokenizer
+        self.tag_ids = {i for token, i in tokenizer.get_added_vocab().items() if TAG.fullmatch(token)} & set(tokenizer.all_special_ids)
         self.lock = asyncio.Lock()
         self.model.config.use_cache = True
         self.last_latency_ms = None
@@ -83,7 +85,7 @@ class Engine:
         # Frequent provisional hypotheses use greedy; pauses/recovery/finish use
         # the selected quality decoder. No expected-text prompt in either mode.
         beams = self.num_beams if final else 1
-        budget = None if final else min(self.model.config.max_target_positions, max(64, int(len(audio) / SAMPLE_RATE * 25) + 32))
+        budget = None if final else min(self.model.config.max_target_positions, max(64, int(len(audio) / SAMPLE_RATE * getattr(self, "tokens_per_second", 25)) + 32))
         return self._transcribe(audio, beams, budget, early_stop=True)
 
     def _transcribe(self, audio, beams, budget=None, early_stop=False):
@@ -109,6 +111,9 @@ class Engine:
         if not self.last_diagnostics["scorable"]:
             logger.warning("ASR abstained on decode flags: %s", self.last_diagnostics["decode_flags"])
             return ""  # Empty evidence cannot turn a model loop into learner penalties.
+        if getattr(self, "tag_ids", None):
+            skip = set(self.processor.tokenizer.all_special_ids) - self.tag_ids
+            return self.processor.tokenizer.decode([t for t in ids[0].tolist() if t not in skip]).strip()
         return self.processor.batch_decode(ids, skip_special_tokens=True)[0].strip()
 
     def check(self, audio, candidates):
@@ -121,14 +126,128 @@ class Engine:
         return transcript, lessons.candidate_logprobs(self.model, self.processor.tokenizer, features, candidates)
 
 
+class ModelUnavailable(Exception):
+    def __init__(self, message, status=503):
+        super().__init__(message)
+        self.status = status
+
+
+class Registry:
+    """Named engines loaded once per process.
+
+    Engines on one device share one lock: concurrent decodes would only contend
+    for the same cores/GPU, and serialising keeps the latency profile of the
+    single-model server. A tajweed engine that is missing (not trained yet) is
+    reported unavailable and loads on first use once its directory appears;
+    requests for it fall back to the default engine, flagged in the response.
+    """
+    def __init__(self, specs):
+        self.specs = specs
+        self.default = default_name(specs)
+        self.engines = {}
+        self.failed = {}
+        self.locks = {}
+        self.loading = asyncio.Lock()
+        self.last_latency_ms = None
+
+    @staticmethod
+    def _signature(spec):
+        with suppress(OSError):
+            return max((f.stat().st_mtime_ns for f in spec.path.iterdir()), default=0)
+
+    async def load(self, name):
+        spec = self.specs[name]
+        if name in self.engines or not spec.present():
+            return self.engines.get(name)  # Never wait behind another engine's load.
+        async with self.loading:
+            if name in self.engines:
+                return self.engines[name]
+            if not spec.present() or name in self.failed and self.failed[name][0] == self._signature(spec):
+                return None
+            try:
+                engine = await asyncio.to_thread(Engine, spec)
+            except Exception as exc:
+                if name == self.default:
+                    raise
+                logger.exception("Could not load model %s from %s", name, spec.path)
+                self.failed[name] = (self._signature(spec), str(exc))
+                return None
+            self.failed.pop(name, None)
+            engine.lock = self.locks.setdefault(engine.device, engine.lock)
+            self.engines[name] = engine
+            logger.info("Loaded %s (%s) from %s on %s", name, spec.kind, spec.path, engine.device)
+            return engine
+
+    async def start(self):
+        for name in self.specs:
+            await self.load(name)
+        if self.default not in self.engines:
+            raise RuntimeError(f"Default model {self.default!r} is missing: {self.specs[self.default].path}. No automatic model substitution is performed.")
+
+    async def select(self, requested=None):
+        """(engine, name used, fallback reason or None); ModelUnavailable when nothing suitable is loaded."""
+        name = requested or self.default
+        if name not in self.specs:
+            if name != "tajweed":
+                raise ModelUnavailable(f"Unknown model {name!r}. Configured: {', '.join(self.specs)}.", 400)
+            reason = "not_configured"
+        else:
+            engine = await self.load(name)
+            if engine is not None:
+                return engine, name, None
+            if self.specs[name].kind != "tajweed" or name == self.default:
+                raise ModelUnavailable(f"Model {name!r} is not available on this server.")
+            reason = "load_failed" if name in self.failed else "missing"
+        return self.engines[self.default], self.default, reason
+
+    @property
+    def busy(self):
+        return any(lock.locked() for lock in self.locks.values())
+
+    def describe(self):
+        def where(path):
+            return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+        rows = []
+        for name, spec in self.specs.items():
+            engine = self.engines.get(name)
+            row = {"name": name, "label": spec.label, "path": where(spec.path), "kind": spec.kind,
+                   "available": engine is not None or spec.present() and name not in self.failed,
+                   "loaded": engine is not None, "device": getattr(engine, "device", None)}
+            if name in self.failed:
+                row["error"] = self.failed[name][1]
+            rows.append(row)
+        return rows
+
+
+def heard_with_tags(transcript):
+    """Tag-free transcript, its matcher words and each word's tajweed tags."""
+    clean = strip_tags(transcript)
+    heard = words(clean)
+    hyp, tags = tagged_words(transcript, words)
+    return clean, heard, tags if hyp == heard else [[] for _ in heard]
+
+
+def tajweed_feedback(target_text, hyp_words, hyp_tags):
+    """Optional src.tajweed.feedback hook; never allowed to break recitation."""
+    try:
+        from src.tajweed.feedback import compare
+    except Exception:
+        return None
+    try:
+        return compare(target_text, hyp_words, hyp_tags)
+    except Exception:
+        logger.exception("Tajweed feedback failed; recitation results are unaffected")
+        return None
+
+
 @asynccontextmanager
 async def lifespan(app):
     if not (ASSETS / "manifest.json").exists():
         # Lessons work without the Mushaf cache; the studio needs it.
         logger.warning("Quran assets missing. For the studio run: python src/dataset_collection/cache_quran_pages.py")
-    app.state.engine = await asyncio.to_thread(Engine)
+    app.state.models = Registry(models_from_env(os.environ))
+    await app.state.models.start()
     app.state.sessions = 0
-    logger.info("Loaded %s on %s", MODEL_PATH, app.state.engine.device)
     yield
 
 
@@ -143,6 +262,7 @@ class PracticeRequest(BaseModel):
     audio: str = Field(max_length=SAMPLE_RATE * MAX_PRACTICE_SECONDS * 2 * 4 // 3 + 8)  # base64 PCM16
     target: str = Field(min_length=1, max_length=400)
     alternatives: list[str] = Field(default_factory=list, max_length=6)
+    model: str | None = Field(default=None, pattern="^[a-z0-9][a-z0-9_-]{0,31}$")  # default engine when omitted
 
 
 @app.post("/api/practice")
@@ -157,39 +277,54 @@ async def practice(body: PracticeRequest, request: Request):
         raise HTTPException(400, "Audio must be base64 PCM16")
     if len(raw) % 2 or len(raw) < SAMPLE_RATE // 5:
         raise HTTPException(400, "Recording is too short")
+    try:
+        engine, model_used, fallback = await app.state.models.select(body.model)
+    except ModelUnavailable as exc:
+        raise HTTPException(exc.status, str(exc))
+    used = {"model_used": model_used, "fallback_reason": fallback}
     audio = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768
     if lessons.is_silent(audio):
-        return {"verdict": "silent"}
+        return {"verdict": "silent", **used}
     candidates = [lessons.plain(body.target)]
     if body.mode == "sound" and not 0 < len(candidates[0]) <= 60:
         raise HTTPException(400, "Sound checks need a short target")
     for text in map(lessons.plain, body.alternatives):
         if text and len(text) <= 60 and text not in candidates:
             candidates.append(text)
-    engine = app.state.engine
     async with engine.lock:
         transcript, logprobs = await asyncio.to_thread(
             engine.check, audio, candidates if body.mode == "sound" else [])
         diagnostics = getattr(engine, "last_diagnostics", None)
+    transcript, heard, tags = heard_with_tags(transcript)
     if not transcript or diagnostics is not None and not diagnostics["scorable"]:
         # A decoder failure is NOT an incorrect learner attempt. Non-2xx also
         # prevents the existing client from recording a zero adaptive score/XP.
         raise HTTPException(503, "The model could not reliably score this recording. No mistake or score was recorded; please try again. / تعذّر تقييم التسجيل بثقة؛ لم يُسجّل خطأ أو نتيجة، حاول مجددًا.")
     if body.mode == "reading" or len(candidates) < 2:
-        return lessons.assess_reading(body.target, transcript)
-    if len(logprobs) != len(candidates):
+        result = lessons.assess_reading(body.target, transcript, tags)
+    elif len(logprobs) != len(candidates):
         raise HTTPException(503, "The model could not reliably compare these sounds. Please try again.")
-    return lessons.assess_sound(candidates, 0, logprobs, transcript)
+    else:
+        result = lessons.assess_sound(candidates, 0, logprobs, transcript)
+    result.update(used, tajweed_tags=tag_list(tags))
+    if app.state.models.specs[model_used].kind == "tajweed":
+        feedback = tajweed_feedback(body.target, heard, tags)
+        if feedback is not None:
+            result["tajweed_feedback"] = feedback
+    return result
 
 
 @app.get("/health")
 def health():
-    return {"ready": True, "device": app.state.engine.device, "model": getattr(app.state.engine, "model_name", MODEL_PATH.name),
-             "dtype": getattr(app.state.engine, "precision", None), "beams": getattr(app.state.engine, "num_beams", None),
-             "experimental_adapter": getattr(app.state.engine, "experimental_adapter", False),
+    models = app.state.models
+    engine = models.engines[models.default]
+    return {"status": "ok", "ready": True, "default_model": models.default, "models": models.describe(),
+             "device": engine.device, "model": getattr(engine, "model_name", models.specs[models.default].label),
+             "dtype": getattr(engine, "precision", None), "beams": getattr(engine, "num_beams", None),
+             "experimental_adapter": getattr(engine, "experimental_adapter", False),
              "sample_rate": SAMPLE_RATE, "sessions": app.state.sessions,
-             "busy": app.state.engine.lock.locked(), "max_sessions": MAX_SESSIONS,
-             "last_latency_ms": app.state.engine.last_latency_ms}
+             "busy": models.busy, "max_sessions": MAX_SESSIONS,
+             "last_latency_ms": models.last_latency_ms}
 
 
 @app.websocket("/ws/recite")
@@ -220,8 +355,17 @@ async def recite(ws: WebSocket):
         if type(start_ayah) is not int or not any(a["ayah"] == start_ayah for a in data["ayahs"]):
             raise ValueError("Choose a valid starting ayah")
         tracker.index = next(i for i, a in enumerate(data["ayahs"]) if a["ayah"] == start_ayah)
-        engine = app.state.engine
-        await ws.send_json({"type": "ready", "device": engine.device, "model": getattr(engine, "model_name", MODEL_PATH.name),
+        requested = config.get("model")
+        if requested is not None and type(requested) is not str:
+            raise ValueError("Model must be a model name such as plain or tajweed")
+        try:
+            engine, model_used, fallback = await app.state.models.select(requested)
+        except ModelUnavailable as exc:
+            raise ValueError(str(exc))
+        kind = app.state.models.specs[model_used].kind
+        texts = {a["ayah"]: a.get("text") or a["normalized"] for a in data["ayahs"]}
+        await ws.send_json({"type": "ready", "device": engine.device, "model": getattr(engine, "model_name", model_used),
+                             "model_used": model_used, "model_kind": kind, "fallback_reason": fallback,
                              "trained": data["trained"], "current": start_ayah,
                              "upload_credit_seconds": 12, "window_seconds": 8})
         queue = AudioQueue()
@@ -235,9 +379,10 @@ async def recite(ws: WebSocket):
         origin = 0
         recovery = False
         previous_stitched = []
+        previous_tags = []
 
         async def decode_loop():
-            nonlocal origin, last_decoded, final_voice_decoded, recovery, previous_stitched
+            nonlocal origin, last_decoded, final_voice_decoded, recovery, previous_stitched, previous_tags
             while not tracker.done:
                 try:
                     await asyncio.wait_for(wake.wait(), timeout=0.2)
@@ -307,6 +452,8 @@ async def recite(ws: WebSocket):
                     common_end = min(last_decoded, through)
                     common = queue.read(origin, common_end) if common_end > origin else np.empty(0)
                     silent_overlap = bool(len(common)) and lessons.is_silent(common)
+                # Tags never reach the overlap join or matcher; they are carried alongside the words.
+                transcript, _, window_tags = heard_with_tags(transcript)
                 stitched = overlap.accept(origin, transcript, silent_overlap=silent_overlap) if transcript else None
                 if recovery and through <= last_decoded:
                     stitched = None  # A bounded retry must never cycle without audio progress.
@@ -323,16 +470,23 @@ async def recite(ws: WebSocket):
                     tracker.clear_context()
                     tracker.uncertain_audio = True
                 heard = words(stitched) if stitched is not None else []
+                tags = carry_tags(previous_stitched, previous_tags, overlap.prefix, overlap.raw, window_tags) if stitched is not None else []
                 stable_prefix = 0
                 for old, new in zip(previous_stitched, heard):
                     if old != new:
                         break
                     stable_prefix += 1
-                previous_stitched = heard
+                previous_stitched, previous_tags = heard, tags
                 last_decoded = max(last_decoded, through)
                 if boundary:
                     final_voice_decoded = voice_through
-                update = tracker.feed(stitched, final=boundary, continuous=True, stable_prefix=stable_prefix) if stitched is not None else tracker.snapshot()
+                update = tracker.feed(stitched, final=boundary, continuous=True, stable_prefix=stable_prefix, tags=tags) if stitched is not None else tracker.snapshot()
+                update["tajweed_tags"] = tag_list(tags)
+                for ayah, (hyp, hyp_tags) in tracker.tagged_spans.items():
+                    feedback = tajweed_feedback(texts[ayah], hyp, hyp_tags) if kind == "tajweed" else None
+                    if feedback is not None:
+                        tracker.results[ayah]["tajweed_feedback"] = feedback
+                tracker.tagged_spans.clear()
                 update["tracking_uncertain"] = uncertain or tracker.uncertain_audio
                 if diagnostics is not None:
                     update["asr_scorable"] = diagnostics["scorable"]
@@ -343,7 +497,7 @@ async def recite(ws: WebSocket):
                 update["pending_seconds"] = round(max(0, total - last_decoded) / SAMPLE_RATE, 3)
                 update["window_seconds"] = round(len(audio) / SAMPLE_RATE, 3)
                 update["upload_credit_seconds"] = 12
-                engine.last_latency_ms = update["latency_ms"]
+                engine.last_latency_ms = app.state.models.last_latency_ms = update["latency_ms"]
                 await ws.send_json(update)
                 was_recovery = recovery
                 recovery = False
