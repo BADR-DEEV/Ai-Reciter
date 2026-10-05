@@ -131,9 +131,15 @@ python src/training_with_gpu/train_base_full.py \
   --label-field text_tajweed --labels-jsonl data/tajweed/labels.jsonl --extra-tokens src/tajweed/model_tokens.txt \
   --reader-root data/hf/qaloon-reciter-dataset --reader-root data/hf/qaloon-new-reciters \
   --reciters huthaify husary dokali abusnaina akri daawob deeban kshidan qeniwa \
-  --augment-profile speaker-robust --learning-rate 2e-5 --epochs 4 \
-  --output-dir runs/rattil_tajweed_v1
+  --augment-profile speaker-robust --learning-rate 5e-5 --epochs 10 --patience 3 \
+  --output-dir runs/rattil_qaloon_tajweed_v1
 ```
+
+Generate the two inputs with `python -m src.tajweed.targets` (see [`QALOON_TAJWEED.md`](QALOON_TAJWEED.md)).
+Tagged runs select checkpoints by `tajweed_score` (tag F1 minus macro WER) unless `--select-by` says
+otherwise. The new tag embeddings start from the mean row, so they need a higher learning rate than
+plain fine-tuning; 2e-5 left tag F1 at 0.45 after five epochs on three readers. The serving preset
+`rattil-tajweed-v1` looks for `runs/rattil_qaloon_tajweed_v1`.
 
 - WER always strips `<tj:…>` tags first and is scored against `text_asr_normalized`.
   `--label-field` therefore must not be `text_asr_normalized`.

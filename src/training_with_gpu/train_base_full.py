@@ -253,11 +253,15 @@ def add_extra_tokens(model, tokenizer, tokens):
     if len(tokenizer) != model.config.vocab_size:
         raise ValueError(f"Extra tokens need a tokenizer covering the whole output vocabulary ({len(tokenizer)} != "
                          f"{model.config.vocab_size}); new IDs would collide with existing embedding rows")
+    added = tokenizer.get_added_vocab()
     present = [token for token in tokens if token in tokenizer.get_vocab()]
-    if present:
-        raise ValueError(f"Already in the vocabulary: {present[:5]}")
+    if any(token not in added for token in present):
+        raise ValueError(f"Already ordinary vocabulary: {[t for t in present if t not in added][:5]}")
+    missing = [token for token in tokens if token not in added]
+    if not missing:
+        return tokenizer.convert_tokens_to_ids(tokens)  # continuing a tagged run: reuse its trained rows
     old = model.config.vocab_size
-    tokenizer.add_tokens(tokens)
+    tokenizer.add_tokens(missing)
     model.resize_token_embeddings(len(tokenizer), mean_resizing=False)
     with torch.no_grad():
         for embeddings in {id(e): e for e in (model.get_input_embeddings().weight, model.get_output_embeddings().weight)}.values():

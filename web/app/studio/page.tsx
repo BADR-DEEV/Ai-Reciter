@@ -20,7 +20,7 @@ import { TafsirPanel } from "@/components/tafsir-panel";
 import { ServiceStatus } from "@/components/service-status";
 import { TajweedLegend } from "@/components/tajweed-legend";
 import { TajweedInspector } from "@/components/tajweed-inspector";
-import { TajweedFeedbackCard, missedByWord, type TajweedFeedback } from "@/components/tajweed-feedback";
+import { TajweedFeedbackCard, type TajweedFeedback } from "@/components/tajweed-feedback";
 
 type View = "mushaf" | "text" | "phonetic" | "meaning";
 function Ornament() { return <span className="ornament" aria-hidden="true"><span>✦</span></span>; }
@@ -152,7 +152,7 @@ export default function Studio() {
                 const display = (ayah.displayText || ayah.text).replace(/[\u0660-\u0669\d]+/g, "").trim();
                 const phoneticCursor = phonetics.words.length === display.split(/\s+/).length ? cursor : null;
                 return <div key={ayah.ayah} data-ayah={ayah.ayah} onClick={() => { if (!active && !playback) setFocusAyah(ayah.ayah); }} className={`text-ayah ${results[ayah.ayah]?.status || (ayah.ayah === current && active ? "listening" : "pending")} ${playback?.ayah === ayah.ayah ? "playback-ayah" : ""}`}>
-                  <div className="ayah-reading-line">{mode === "phonetic" ? phonetics.words.map((word, i) => <span key={i}><span className={`quran-word ${results[ayah.ayah]?.words?.[i]?.status || "pending"} ${phoneticCursor === i ? "playback-word" : ""}`} data-word-index={i} aria-current={phoneticCursor === i ? "true" : undefined}>{word}</span>{" "}</span>) : <AyahWords ayah={ayah} result={results[ayah.ayah]} tajweed={tajweed.ayahs?.get(ayah.ayah)} rules={tajweed.rules} settings={tajweedSettings} missed={missedByWord(results[ayah.ayah]?.tajweed_feedback as TajweedFeedback | undefined)} lang={lang} activeWord={cursor} />}<span className="ayah-medallion">{ayah.ayah.toLocaleString(lang)}</span></div>
+                  <div className="ayah-reading-line">{mode === "phonetic" ? phonetics.words.map((word, i) => <span key={i}><span className={`quran-word ${results[ayah.ayah]?.words?.[i]?.status || "pending"} ${phoneticCursor === i ? "playback-word" : ""}`} data-word-index={i} aria-current={phoneticCursor === i ? "true" : undefined}>{word}</span>{" "}</span>) : <AyahWords ayah={ayah} result={results[ayah.ayah]} tajweed={tajweed.ayahs?.get(ayah.ayah)} rules={tajweed.rules} settings={tajweedSettings} feedback={results[ayah.ayah]?.tajweed_feedback as TajweedFeedback | undefined} lang={lang} activeWord={cursor} />}<span className="ayah-medallion">{ayah.ayah.toLocaleString(lang)}</span></div>
                   {(showPhonetics && mode === "text" || mode === "meaning") && <PhoneticAid text={ayah.text} activeWord={phoneticCursor} />}
                   {mode === "phonetic" && phonetics.warnings.length > 0 && <details className="phonetic-review"><summary>{c("Pronunciation review notes", "ملاحظات مراجعة النطق")}</summary><ul>{phonetics.warnings.map(w => <li key={w}>{w}</li>)}</ul></details>}
                   <AyahListen surah={selected} ayah={ayah.ayah} reciter={reciter} disabled={active} displayText={display} onPlayback={followPlayback} />

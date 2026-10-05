@@ -276,8 +276,11 @@ class ExtraTokenTests(unittest.TestCase):
             self.assertEqual(model.config.vocab_size, old + 2)
             self.assertIs(model.get_output_embeddings().weight, model.get_input_embeddings().weight)
             self.assertTrue(torch.allclose(model.get_input_embeddings().weight[old:], mean.expand(2, -1)))
-            with self.assertRaisesRegex(ValueError, "Already"):
-                add_extra_tokens(model, tokenizer, ["<tj:madd>"])
+            # Continuing a tagged run reuses the trained rows instead of adding duplicates.
+            self.assertEqual(add_extra_tokens(model, tokenizer, ["<tj:madd>"]), [old + 1])
+            self.assertEqual(model.config.vocab_size, old + 2)
+            with self.assertRaisesRegex(ValueError, "Already ordinary vocabulary"):
+                add_extra_tokens(model, tokenizer, [tokenizer.convert_ids_to_tokens(5)])
             text = "انَّ<tj:ghunna> الله<tj:madd>"
             labels = tokenizer(text).input_ids
             self.assertIn(old, labels)
