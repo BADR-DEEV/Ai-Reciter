@@ -70,10 +70,15 @@ async function models(): Promise<ModelEntry[]> {
   const run = path.join(ROOT, "runs/deepdml_qaloon_lora_base_v1");
   const adapter = await json(path.join(run, "adapter/adapter_config.json"));
   return [
-    await fullModel("rattil-v3", path.join(ROOT, "runs/rattil_qaloon_v3"), "Full fine-tune · recommended",
+    await fullModel("rattil-v4", path.join(ROOT, "runs/rattil_qaloon_v4"), "Full fine-tune · recommended (joined ayahs)",
+      "Hugging Face Mathani-Ayat/rattil-qaloon-v4@eb62c35 (src/deployment/pull_hf_assets.py)",
+      "Waleed (held-out voice): 2.0% WER normal speed · 11.9% at 1.25× · 20.4% at 1.5× (model card)"),
+    await fullModel("rattil-v3", path.join(ROOT, "runs/rattil_qaloon_v3"), "Full fine-tune · previous default",
       "Hugging Face Mathani-Ayat/rattil-qaloon-v3@e9e59ac (src/deployment/pull_hf_assets.py)",
       "Waleed (held-out voice): 2.2% WER normal speed · 13.4% at 1.25× · 21.2% at 1.5× (model card)"),
-    await fullModel("rattil-tajweed-v1", path.join(ROOT, "runs/rattil_qaloon_tajweed_v1"), "Tajweed-tagged full fine-tune · ahkam check",
+    await fullModel("rattil-tajweed-v2", path.join(ROOT, "runs/rattil_qaloon_tajweed_v2"), "Tajweed fine-tune of v4 · ahkam check (10 readers + plain negatives)",
+      "Trained locally: python -m src.tajweed.prepare_data, src.tajweed.targets, train_base_full.py (docs/QALOON_TAJWEED.md)"),
+    await fullModel("rattil-tajweed-v1", path.join(ROOT, "runs/rattil_qaloon_tajweed_v1"), "Tajweed-tagged full fine-tune · first proof of concept",
       "Trained locally: python -m src.tajweed.targets, then train_base_full.py (docs/QALOON_TAJWEED.md)"),
     await fullModel("gpu-full-base", path.join(ROOT, "runs/gpu_base_full"), "Full fine-tune · original team model",
       release ? `Hugging Face ${release.repo_id}@${release.commit.slice(0, 7)} (src/deployment/restore_local_full.py)` : "Hugging Face release"),

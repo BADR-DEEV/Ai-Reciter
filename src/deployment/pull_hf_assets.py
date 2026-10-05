@@ -17,7 +17,10 @@ from huggingface_hub.errors import HfHubHTTPError, LocalEntryNotFoundError
 
 ROOT = Path(__file__).resolve().parents[2]
 STATUS = ROOT / "data/hf/pull-status.json"
-MODEL = ("Mathani-Ayat/rattil-qaloon-v3", "e9e59ac3db6cb096a0657f81f22365be189dda50", ROOT / "runs/rattil_qaloon_v3")
+MODELS = {
+    "v4": ("Mathani-Ayat/rattil-qaloon-v4", "eb62c35", ROOT / "runs/rattil_qaloon_v4"),  # default (joined-ayah training)
+    "v3": ("Mathani-Ayat/rattil-qaloon-v3", "e9e59ac3db6cb096a0657f81f22365be189dda50", ROOT / "runs/rattil_qaloon_v3"),
+}
 DATASETS = {
     # Approved readers used by the web app (reference audio, challenges) plus Garu.
     "qaloon-reciter-dataset": "d0d2bdbbc757d09c05d1f0cdfabd67cc19420a83",
@@ -25,7 +28,10 @@ DATASETS = {
     "qaloon-reciter-experiments": "06cebc9ed98ef5e308da92aa4f09240460a760c7",
     # Six mp3quran readers added for v2/v3 training, plus an `unapproved/` folder.
     "qaloon-new-reciters": "ac53eb3c989d666c2cf6f68b9d008417356b23ab",
+    # All ten approved readers relabelled with one normalizer (training the tajweed model); unapproved/ is skipped.
+    "qaloon-all-reciters": "b5d51bcf2bdb7b53a0cd3bb580741e9304ed6183",
 }
+SKIP = {"qaloon-all-reciters": ["dataset_qaloon_*/*", "dataset_qaloon_*/*/*", "README.md"]}
 # The web app reads these from src/dataset_collection/<folder> (web/lib/reciters.ts).
 APP_READERS = ["dataset_qaloon_hutafi", "dataset_qaloon_Husary", "dataset_qaloon_dokali"]
 RATE_WAIT = 300  # the Hub allows 1000 requests per 5 minutes
@@ -96,21 +102,22 @@ def link_app_readers(dataset_root):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--skip-model", action="store_true")
-    parser.add_argument("--datasets", nargs="*", choices=list(DATASETS), default=list(DATASETS),
-                        help="Which dataset repos to pull (default: all). Pass none to skip datasets.")
+    parser.add_argument("--models", nargs="*", choices=list(MODELS), default=["v4"], help="Which Rattil models (default: v4)")
+    parser.add_argument("--datasets", nargs="*", choices=list(DATASETS), default=[d for d in DATASETS if d != "qaloon-all-reciters"],
+                        help="Which dataset repos to pull (default: all but qaloon-all-reciters). Pass none to skip datasets.")
     parser.add_argument("--readers-only", action="store_true",
                         help="Only the web app's reference readers (Huthaify, Husary, Dokali; ~330 MB)")
     args = parser.parse_args()
     if args.readers_only:
         args.datasets = ["qaloon-reciter-dataset"]
     try:
-        if not args.skip_model:
-            repo, revision, out = MODEL
+        for name in [] if args.skip_model else args.models:
+            repo, revision, out = MODELS[name]
             pull(repo, out, revision)
             print(f"Model {repo}@{revision[:7]} -> {out.relative_to(ROOT)}", flush=True)
         for name in args.datasets:
             out = ROOT / "data/hf" / name
-            readers = [f"{reader}/*" for reader in APP_READERS] if args.readers_only else None
+            readers = [f"{reader}/*" for reader in APP_READERS] if args.readers_only else SKIP.get(name)
             pull(f"Mathani-Ayat/{name}", out, DATASETS[name], repo_type="dataset", patterns=readers)
             print(f"Dataset {name}@{DATASETS[name][:7]} -> {out.relative_to(ROOT)}", flush=True)
             if name == "qaloon-reciter-dataset":
