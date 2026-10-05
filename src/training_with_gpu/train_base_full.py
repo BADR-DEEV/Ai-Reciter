@@ -101,6 +101,8 @@ def parse_args(argv=None, *, default_model="openai/whisper-base", default_recite
     p.add_argument("--label-field", default="text_asr_normalized", help="Metadata field used as the decoder target")
     p.add_argument("--labels-jsonl", type=Path, help="Targets joined by reciter_key+relative_audio_path or surah+ayah into --label-field")
     p.add_argument("--extra-tokens", type=Path, help="One token per line, added as NON-special tokens (e.g. <tj:ghunna>)")
+    p.add_argument("--select-by", choices=["macro_reciter_wer", "tajweed_score"],
+                   help="Checkpoint selection; tajweed_score = tag F1 minus macro WER (default when --extra-tokens is given)")
     p.add_argument("--epochs", type=int, default=7)
     p.add_argument("--patience", type=int, default=2)
     p.add_argument("--learning-rate", type=float, default=1.25e-5, help="Standard safe LR for full fine-tuning")
@@ -473,6 +475,10 @@ def main(argv=None, **defaults):
     def normalize_word(word):
         return normalize_quran_for_asr(word).replace(" ", "")
 
+    select_by = args.select_by or ("tajweed_score" if tagged else "macro_reciter_wer")
+    if select_by == "tajweed_score" and not tagged:
+        raise ValueError("--select-by tajweed_score needs tagged targets (--extra-tokens)")
+
     def generated_metrics(prediction):
         from src.training.asr_metrics import report_predictions
         ids = prediction.predictions[0] if isinstance(prediction.predictions, tuple) else prediction.predictions
@@ -489,6 +495,8 @@ def main(argv=None, **defaults):
         if tagged:
             tags = tag_scores([(row[args.label_field], text) for row, text in zip(splits["validation"], hypotheses)], normalize_word)
             metrics.update({f"tag_{k}": tags[k] for k in ("precision", "recall", "f1") if tags[k] is not None})
+            # Tags must improve without trading away word accuracy (a looping epoch can spike WER).
+            metrics["tajweed_score"] = (tags["f1"] or 0.0) - scores["macro_reciter_wer"]
         return metrics
 
     training_args = Seq2SeqTrainingArguments(
@@ -509,8 +517,8 @@ def main(argv=None, **defaults):
         save_strategy="epoch",
         save_total_limit=2,
         load_best_model_at_end=True,
-        metric_for_best_model="macro_reciter_wer",
-        greater_is_better=False,
+        metric_for_best_model=select_by,
+        greater_is_better=select_by == "tajweed_score",
         remove_unused_columns=False,
         label_names=["labels"],
         predict_with_generate=True,
@@ -547,7 +555,7 @@ def main(argv=None, **defaults):
         "augmentation": {"profile": args.augment_profile, **asdict(augmentation)}, "spec_augment": spec_augment,
         "device": device, "precision": precision,
         "normalizer_version": NORMALIZER_VERSION, "label_overlay_changes": label_changes,
-        "selection": "generated-macro-reader-development-WER-beam3-not-cross-entropy",
+        "selection": f"generated-development-{select_by}-beam3-not-cross-entropy",
         "fixed_parameters": [name for name, parameter in model.named_parameters() if not parameter.requires_grad],
         "generation_template": {"model": "openai/whisper-base", "revision": OPENAI_REVISION, "purpose": "language-task-token-metadata-only-not-weights"},
         "split_protocol": protocol, "holdout_reciters": sorted(args.holdout_reciter),
@@ -570,7 +578,7 @@ def main(argv=None, **defaults):
 
     # Test evaluation
     from gpu_evaluation import evaluate_rows, summarize_predictions
-    result = {"model": model_id, "best_validation_macro_reciter_wer": trainer.state.best_metric, "seed": args.seed,
+    result = {"model": model_id, f"best_validation_{select_by}": trainer.state.best_metric, "seed": args.seed,
                "init_revision": manifest["init_revision"], "is_smoke_run": manifest["is_smoke_run"],
                "pretraining_overlap": manifest["tarteel_pretraining_data_overlap"],
               "label_field": args.label_field, "split_counts": counts,

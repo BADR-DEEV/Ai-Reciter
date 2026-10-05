@@ -85,6 +85,17 @@ class GeneralTajweed(unittest.TestCase):
         self.assertIn("madd_iwad", rules_on("إِنَّ اَ۬للَّهَ كَانَ عَلَيْكُمْ رَقِيباٗ", "اࣰ"))
         self.assertIn("madd_lin", rules_on("لِإِيلَٰفِ قُرَيْشٍ", "يْ"))
 
+    def test_cases_from_the_first_draft(self):
+        self.assertIn("madd_lazim", {a.rule for a in annotate("وَلَا جَانٌّ").annotations})
+        self.assertNotIn("madd_arid", {a.rule for a in annotate("وَلَا جَانٌّ").annotations})
+        self.assertIn("madd_lin", {a.rule for a in annotate("خَوْفٍ").annotations})
+        self.assertNotIn("madd_lin", {a.rule for a in annotate("خَوْفٍ عَلَيْهِمْ").annotations})
+        self.assertIn("madd_iwad", {a.rule for a in annotate("أَحَدًا").annotations})
+        self.assertNotIn("qalqala_waqf", {a.rule for a in annotate("أَحَدًا").annotations})
+        self.assertNotIn("madd_iwad", {a.rule for a in annotate("رَحْمَةً").annotations})
+        self.assertIn("qalqala_waqf", {a.rule for a in annotate("أَحَدٌ").annotations})
+        self.assertIn("ikhfa_shafawi", {a.rule for a in annotate("تَرْمِيهِمْ بِحِجَارَةٍ").annotations})
+
     def test_opening_letters(self):
         text = "أَلَٓمِّٓۖ ذَٰلِكَ اَ۬لْكِتَٰبُ"
         self.assertIn("madd_lazim_harfi", rules_on(text, "لَٓ", 2, 1))
