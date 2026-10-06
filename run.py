@@ -297,7 +297,7 @@ def main():
         if not ready:
             fail("Rattil did not start (see the messages above).")
         if args.check:
-            say("Check passed: " + ("the API and " if with_api else "") + "the web app answer.")
+            say("Check passed: " + ("the API and the web app answer." if with_api else "the web app answers."))
             return
         say(f"Rattil is running at {web_url}  (Ctrl+C to stop)")
         if not args.no_browser:

@@ -39,3 +39,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         run: run.bat --check --no-browser %SKIP%
+      - name: Reader folders link without symlink rights (Windows junction)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: .venv\Scripts\python.exe -m unittest -v src.deployment.test_pull_hf_assets

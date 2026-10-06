@@ -10,6 +10,7 @@ from fnmatch import fnmatch
 import json
 import os
 from pathlib import Path
+import sys
 import time
 
 from huggingface_hub import HfApi, snapshot_download
@@ -128,6 +129,7 @@ def main():
     args = parser.parse_args()
     if args.readers_only:
         args.datasets = ["qaloon-reciter-dataset"]
+    repo = "Mathani-Ayat"
     try:
         for name in [] if args.skip_model else args.models:
             repo, revision, out = MODELS[name]
@@ -136,12 +138,16 @@ def main():
         for name in args.datasets:
             out = ROOT / "data/hf" / name
             readers = [f"{reader}/*" for reader in APP_READERS] if args.readers_only else SKIP.get(name)
-            pull(f"Mathani-Ayat/{name}", out, DATASETS[name], repo_type="dataset", patterns=readers)
+            repo = f"Mathani-Ayat/{name}"
+            pull(repo, out, DATASETS[name], repo_type="dataset", patterns=readers)
             print(f"Dataset {name}@{DATASETS[name][:7]} -> {out.relative_to(ROOT)}", flush=True)
             if name == "qaloon-reciter-dataset":
                 link_app_readers(out)
     except BaseException as error:
         status("failed", message=f"{type(error).__name__}: {error}"[:500])
+        if isinstance(error, HfHubHTTPError) and denied(error):
+            sys.exit(f"No access to {repo} on Hugging Face (HTTP {error.response.status_code}): the repo is private "
+                     "or missing. Log in with `hf auth login` or set HF_TOKEN.")
         raise
     status("done")
 
