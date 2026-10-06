@@ -1,0 +1,14 @@
+# HTTPS in front of `python run.py --public-url https://<host>`. Caddy gets and renews the certificate itself.
+# Replace RATTIL_HOST with the public hostname (a domain pointing at the server, or <ip-with-dashes>.sslip.io),
+# copy to /etc/caddy/Caddyfile and run `sudo systemctl reload caddy`. Ports 80 and 443 must be open.
+RATTIL_HOST {
+	# The recognition API (src/streaming/server.py); everything else is the web app.
+	@api path /ws/recite /health /api/practice /api/search
+	handle @api {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle {
+		encode zstd gzip
+		reverse_proxy 127.0.0.1:3000
+	}
+}

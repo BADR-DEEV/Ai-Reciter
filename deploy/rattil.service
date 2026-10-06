@@ -1,0 +1,17 @@
+# systemd unit for a Linux server. Replace RATTIL_HOST (and User/WorkingDirectory if the clone is elsewhere), copy to /etc/systemd/system/rattil.service, then
+# `sudo systemctl daemon-reload && sudo systemctl enable --now rattil`. Logs: `journalctl -u rattil -f`.
+[Unit]
+Description=Rattil (recognition API and web app)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Ai-Reciter
+ExecStart=/usr/bin/python3 run.py --no-browser --device cpu --public-url https://RATTIL_HOST
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
