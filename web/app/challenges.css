@@ -55,3 +55,16 @@
 .profile-stats,.profile-actions{display:flex;gap:22px;flex-wrap:wrap;margin:20px 0;color:var(--green)}
 @media(max-width:960px){.challenge-modes{grid-template-columns:repeat(3,minmax(0,1fr))}.lh-header{gap:16px}.lh-nav{gap:14px}.lh-wordmark span{display:none}}
 @media(max-width:640px){.lh-header{height:auto;min-height:76px;flex-wrap:wrap;padding:14px 16px;gap:12px}.lh-nav{order:3;width:100%;justify-content:space-between;gap:8px}.lh-nav a{font-size:12px;padding:6px 0}.lh-stat{display:none}.challenge-hero{flex-direction:column;align-items:stretch}.challenge-score{flex-direction:row;flex-wrap:wrap;align-items:center}.challenge-score strong{font-size:21px}.challenge-modes{grid-template-columns:repeat(2,minmax(0,1fr))}.challenge-options{grid-template-columns:1fr}.challenge-question-head{flex-wrap:wrap}.challenge-settings select{width:100%;min-width:0}.challenge-settings label{max-width:100%}.challenge-card .say-panel{padding:16px 8px}}
+/* After an answer: the verdict and the way on sit together, right below the choices. */
+.challenge-card .challenge-feedback{margin-top:22px;scroll-margin-bottom:24px}
+.challenge-feedback-head{display:flex;align-items:center;justify-content:space-between;gap:12px 18px;flex-wrap:wrap;margin-bottom:4px}
+.challenge-feedback-head h2{margin:0}
+.challenge-feedback-head .btn-primary{padding:11px 20px;font-size:14px}
+.challenge-feedback.incorrect{background:#fbf3ef}
+.challenge-feedback .tafsir-panel{margin-bottom:0}
+@media (max-width:560px){.challenge-feedback-head .btn-primary{width:100%}}
+
+.challenge-option.right button:disabled,.challenge-option.wrong button:disabled{opacity:1}
+.challenge-feedback .btn-quiet{padding:9px 16px;font-size:13px}
+.challenge-feedback .tafsir-panel{margin:10px 0 0;padding:0;border:0;background:none}
+.challenge-feedback .tafsir-panel>div{margin-top:10px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;background:#fff}

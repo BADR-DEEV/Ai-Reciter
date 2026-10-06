@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, Headphones, Mic, Puzzle, Sparkles, Volume2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, Headphones, Mic, Puzzle, Sparkles, Volume2 } from "lucide-react";
 import { SiteHeader } from "@/components/learn/site-header";
 import { PhoneticAid } from "@/components/phonetic-aid";
 import { qaloonG2P } from "@/lib/qaloon-g2p";
@@ -53,6 +53,7 @@ export default function GamesPage() {
   const [outcome, setOutcome] = useState<"correct" | "incorrect" | "review">("review");
   const [adaptive, setAdaptive] = useState(false), [skill, setSkill] = useState<SkillHistory>(emptySkill);
   const answered = useRef("");
+  const nextButton = useRef<HTMLButtonElement>(null);
   const [profileRevision, setProfileRevision] = useState(0);
   useEffect(() => {
     const changed = () => { answered.current = ""; setProfileRevision(n => n + 1); };
@@ -95,6 +96,19 @@ export default function GamesPage() {
     }
     if (right) { setCorrect(n => n + 1); complete(`challenge:${question.id}:${difficulty}`, 1, difficulty === "hard" ? 30 : difficulty === "medium" ? 20 : 10); }
   };
+  const nextChallenge = () => {
+    if (adaptive && revealed && outcome !== "review") {
+      const next = nextSkill(skill); setSkill(next); setDifficulty(next.difficulty);
+      try { localStorage.setItem(`${progressKey()}:adaptive-v1:${skillID}`, JSON.stringify(next)); } catch { /* Optional storage. */ }
+    }
+    setRound(n => n + 1);
+  };
+  // The answer appears below the choices: bring it into view with "Next" focused, so Enter moves on.
+  useEffect(() => {
+    if (!revealed || !nextButton.current) return;
+    nextButton.current.focus({ preventScroll: true });
+    nextButton.current.closest(".challenge-feedback")?.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }, [revealed]);
   return <div className="learn-shell" dir={lang === "ar" ? "rtl" : "ltr"}><SiteHeader active="games" /><main className="challenge-main">
     <section className="challenge-hero"><div><p className="hero-kicker">{c("REMEMBER · LISTEN · READ", "تذكّر · استمع · اقرأ")}</p><h1>{c("A little challenge. A stronger connection.", "تحدٍّ صغير، وصلة أقوى بالقرآن.")}</h1><p>{c("Practice Quran reading and recall, not general Arabic. No rush. Return to a teacher for pronunciation.", "تدرّب على قراءة القرآن وتذكّره، لا على العربية العامة. دون استعجال؛ واستعن بمعلم للنطق.")}</p></div><div className="challenge-score"><strong>{progress.xp} {c("XP", "نقطة")}</strong><span>{correct} / {attempts} {c("this session", "في هذه الجلسة")}</span><a href="/profile">{c("Save under your local profile →", "احفظ التقدّم في ملفك المحلي ←")}</a></div></section>
     <div className="challenge-modes">{MODES.map(item => <button key={item.id} aria-pressed={mode === item.id} className={`challenge-mode ${mode === item.id ? "selected" : ""}`} onClick={() => setMode(item.id)}><item.icon size={23} /><strong>{c(item.title, titles[item.id])}</strong><span>{c(item.note, notes[item.id])}</span></button>)}</div>
@@ -122,16 +136,12 @@ export default function GamesPage() {
         }}><Volume2 size={16} />{playing === index ? c("Playing…", "قيد التشغيل…") : c(`Audio ${index + 1}`, `المقطع ${index + 1}`)}</button>}
         <button role="radio" aria-checked={picked === index} disabled={revealed} onClick={() => setPicked(index)} lang={mode === "surah" || mode === "audio" ? lang : "ar"} dir={(mode === "surah" || mode === "audio") && lang === "en" ? "ltr" : "rtl"}>{option.audio ? c(`Choose audio ${index + 1}`, `اختر المقطع ${index + 1}`) : mode === "surah" ? option.label : <OptionText option={option} mode={mode} phonetics={phonetics} />}</button>
       </div>)}</div>}
-      <div className="challenge-actions">{!revealed && choices && <button className="btn-primary" disabled={picked === null} onClick={() => { stopAudio(); award(picked === question.answer); }}>{c("Check answer", "تحقّق من الإجابة")}</button>}
-        {!revealed && <button className="btn-quiet" onClick={() => { setRevealed(true); stopAudio(); }}>{c("Show answer · no XP", "أظهر الإجابة · دون نقاط")}</button>}
-        <button className="btn-quiet" onClick={() => {
-          if (adaptive && revealed && outcome !== "review") {
-            const next = nextSkill(skill); setSkill(next); setDifficulty(next.difficulty);
-            try { localStorage.setItem(`${progressKey()}:adaptive-v1:${skillID}`, JSON.stringify(next)); } catch { /* Optional storage. */ }
-          }
-          setRound(n => n + 1);
-        }}>{revealed ? c("Next challenge", "التحدي التالي") : c("Skip", "تخطَّ")}</button></div>
-      {revealed && <div className="challenge-feedback" role="status"><h2>{outcome === "correct" ? c("Well remembered!", "أحسنت التذكّر!") : outcome === "incorrect" ? c("A chance to learn", "فرصة للتعلّم") : c("Take a moment to review", "راجع على مهل")}</h2><p>{question.explanation}</p><p className="challenge-ayah" lang="ar" dir="rtl">{question.target}</p>
+      {!revealed && <div className="challenge-actions">{choices && <button className="btn-primary" disabled={picked === null} onClick={() => { stopAudio(); award(picked === question.answer); }}>{c("Check answer", "تحقّق من الإجابة")}</button>}
+        <button className="btn-quiet" onClick={() => { setRevealed(true); stopAudio(); }}>{c("Show answer · no XP", "أظهر الإجابة · دون نقاط")}</button>
+        <button className="btn-quiet" onClick={nextChallenge}>{c("Skip", "تخطَّ")}</button></div>}
+      {revealed && <div className={`challenge-feedback ${outcome}`} role="status"><div className="challenge-feedback-head"><h2>{outcome === "correct" ? c("Well remembered!", "أحسنت التذكّر!") : outcome === "incorrect" ? c("A chance to learn", "فرصة للتعلّم") : c("Take a moment to review", "راجع على مهل")}</h2>
+          <button ref={nextButton} className="btn-primary" onClick={nextChallenge}>{c("Next challenge", "التحدي التالي")}{lang === "ar" ? <ArrowLeft size={17} /> : <ArrowRight size={17} />}</button></div>
+        <p>{question.explanation}</p><p className="challenge-ayah" lang="ar" dir="rtl">{question.target}</p>
         {phonetics && <PhoneticAid text={question.target} />}<a className="btn-quiet" href={`/studio?surah=${question.surah}`}>{c("Practice this surah in the studio", "تدرّب على هذه السورة في الاستوديو")}</a><TafsirPanel surah={question.surah} ayah={question.ayah} /></div>}
       <small className="similarity-note">{c("Distractor method:", "طريقة اختيار البدائل:")} {question.similarity}. {c("XP is practice progress, not religious competency.", "النقاط للتقدّم التدريبي، وليست حكمًا على الإتقان الديني.")}</small>
     </section>}
