@@ -104,13 +104,16 @@ test("actual reader clips differ; invalid and unavailable voices never silently 
 test("all navigation remains available and reader modes fit a phone in both languages", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/studio");
-  for (const label of ["Ayah view", "Phonetics", "Meaning + phonetics", "Mushaf"]) {
-    await page.getByRole("button", { name: label, exact: true }).click();
+  for (const mode of ["text", "phonetic", "meaning", "mushaf"]) {
+    await page.getByRole("combobox", { name: "Reader view", exact: true }).selectOption(mode);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
-  await expect(page.locator('nav a[href="/studio"]')).toHaveAttribute("aria-current", "page");
-  await expect(page.locator('nav a[href="/profile"]')).toBeVisible();
-  await expect(page.locator('nav a[href="/"]')).toBeVisible();
+  await expect(page.locator('.mobile-audio-slot .start-button')).toBeVisible();
+  await expect(page.locator('.mobile-nav a[href="/studio"]')).toHaveAttribute("aria-current", "page");
+  await page.locator('.mobile-nav > button').click();
+  await expect(page.locator('.mobile-menu a[href="/"]')).toBeVisible();
+  await expect(page.locator('.mobile-menu a[href="/profile"]')).toBeVisible();
+  await page.keyboard.press("Escape");
   await page.locator(".lh-lang").click();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, Loader2, Mic, RotateCcw, Square, Upload } from "lucide-react";
 import { SiteHeader } from "@/components/learn/site-header";
+import { MobileAudioControl } from "@/components/mobile-navigation";
 import { AyahWords } from "@/components/ayah-words";
 import { AyahListen } from "@/components/ayah-listen";
 import { TafsirPanel } from "@/components/tafsir-panel";
@@ -184,12 +185,12 @@ export default function FindAyah() {
         {online === false && <div className="notice" role="status">{c("The listening model isn’t running, so search can’t hear you yet. Start it with", "نموذج الاستماع لا يعمل، لذا لا يمكن البحث الآن. شغّله بالأمر")} <code dir="ltr">python -m src.streaming.serve --model rattil-v3</code></div>}
 
         <section className="find-stage" aria-label={c("Listen", "الاستماع")}>
-          <button className={`find-star ${phase}`} style={{ "--level": listening ? recorder.level : 0 } as React.CSSProperties}
+          <MobileAudioControl keepInline><button className={`find-star ${phase}`} style={{ "--level": listening ? recorder.level : 0 } as React.CSSProperties}
             disabled={busy || blocked} onClick={() => void listen()}
             aria-label={listening ? c("Stop and search", "توقّف وابحث") : c("Listen and find the ayah", "استمع وابحث عن الآية")}>
             <span className="find-star-ring" aria-hidden="true" /><span className="find-star-ring" aria-hidden="true" /><span className="find-star-ring" aria-hidden="true" />
             <span className="find-star-core" aria-hidden="true">{busy ? <Loader2 size={30} className="spin" /> : listening ? <Square size={24} fill="currentColor" /> : <Mic size={32} />}</span>
-          </button>
+          </button></MobileAudioControl>
           <p className="find-status" aria-live="polite">{status}</p>
           <input ref={fileInput} type="file" accept="audio/*,.wav,.mp3,.m4a,.ogg,.flac" hidden aria-label={c("Choose a recording", "اختر تسجيلًا")}
             onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void upload(file); }} />

@@ -192,6 +192,64 @@ def ensure_web_build(npm, env):
 
 # ---------- Start and stop ----------
 
+class WindowsServerJob:
+    """Own server descendants: Windows kills them even if the console closes abruptly."""
+
+    def __init__(self):
+        self.handle = None
+        if not WINDOWS:
+            return
+        import ctypes
+        from ctypes import wintypes
+
+        class BasicLimits(ctypes.Structure):
+            _fields_ = [("PerProcessUserTimeLimit", ctypes.c_longlong),
+                        ("PerJobUserTimeLimit", ctypes.c_longlong), ("LimitFlags", wintypes.DWORD),
+                        ("MinimumWorkingSetSize", ctypes.c_size_t), ("MaximumWorkingSetSize", ctypes.c_size_t),
+                        ("ActiveProcessLimit", wintypes.DWORD), ("Affinity", ctypes.c_size_t),
+                        ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD)]
+
+        class IOCounters(ctypes.Structure):
+            _fields_ = [(name, ctypes.c_ulonglong) for name in
+                        ("ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+                         "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+        class ExtendedLimits(ctypes.Structure):
+            _fields_ = [("BasicLimitInformation", BasicLimits), ("IoInfo", IOCounters),
+                        ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                        ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+        self.kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        self.kernel.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+        self.kernel.CreateJobObjectW.restype = wintypes.HANDLE
+        self.kernel.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+        self.kernel.SetInformationJobObject.restype = wintypes.BOOL
+        self.kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        self.kernel.AssignProcessToJobObject.restype = wintypes.BOOL
+        self.kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        self.kernel.CloseHandle.restype = wintypes.BOOL
+        self.handle = self.kernel.CreateJobObjectW(None, None)
+        if not self.handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        limits = ExtendedLimits()
+        limits.BasicLimitInformation.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not self.kernel.SetInformationJobObject(self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+            error = ctypes.get_last_error()
+            self.close()
+            raise ctypes.WinError(error)
+
+    def assign(self, process):
+        if self.handle:
+            import ctypes
+            if not self.kernel.AssignProcessToJobObject(self.handle, int(process._handle)):
+                raise ctypes.WinError(ctypes.get_last_error())
+
+    def close(self):
+        if self.handle:
+            self.kernel.CloseHandle(self.handle)
+            self.handle = None
+
+
 def port_free(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         if not WINDOWS:  # like uvicorn and Node: a port left in TIME_WAIT by the last run is free
@@ -203,16 +261,23 @@ def port_free(port):
             return False
 
 
-def start(command, cwd, env):
+def start(command, cwd, env, job=None):
     group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if WINDOWS else {"start_new_session": True}
-    return subprocess.Popen([str(c) for c in command], cwd=cwd, env=env, **group)
+    process = subprocess.Popen([str(c) for c in command], cwd=cwd, env=env, **group)
+    try:
+        if job is not None:
+            job.assign(process)
+    except BaseException:
+        stop(process)
+        raise
+    return process
 
 
 def stop(process):
-    if process.poll() is not None:
-        return
     if WINDOWS:
-        subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True)
+        if process.poll() is None:
+            subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True, timeout=15)
+            process.wait(timeout=15)
     else:
         try:
             os.killpg(process.pid, signal.SIGTERM)
@@ -287,11 +352,12 @@ def main():
         ensure_web_build(npm, web_env)
 
     processes = []
+    job = WindowsServerJob()
     try:
         if with_api:
             processes.append(start([venv_python(), "-m", "src.streaming.serve", "--model", "rattil-v4", "--port", args.api_port,
-                                    "--device", args.device, "--beams", args.beams], ROOT, api_env))
-        processes.append(start([npm, "run", "dev" if args.dev else "start", "--", "-p", args.web_port], WEB, web_env))
+                                    "--device", args.device, "--beams", args.beams], ROOT, api_env, job))
+        processes.append(start([npm, "run", "dev" if args.dev else "start", "--", "-p", args.web_port], WEB, web_env, job))
         ready = (not with_api or wait_until("recognition API", f"http://127.0.0.1:{args.api_port}/health", processes, 600)) \
             and wait_until("web app", web_url, processes, 300)
         if not ready:
@@ -308,8 +374,16 @@ def main():
     except KeyboardInterrupt:
         say("Stopping...")
     finally:
-        for process in processes:
-            stop(process)
+        try:
+            for process in reversed(processes):
+                try:
+                    stop(process)
+                except (OSError, subprocess.TimeoutExpired) as error:
+                    say(f"Server shutdown: {error}")
+        finally:
+            # The job also owns descendants left behind if npm/the API parent already exited.
+            # If Windows terminates this launcher, it closes this handle automatically.
+            job.close()
 
 
 if __name__ == "__main__":

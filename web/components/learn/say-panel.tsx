@@ -8,6 +8,7 @@ import { LETTERS } from "@/lib/learn/letters";
 import { Rich } from "./rich";
 import { speak, stopAudio } from "@/lib/learn/speech";
 import { useRecorder, wavUrl } from "@/lib/learn/use-recorder";
+import { MobileAudioControl } from "@/components/mobile-navigation";
 
 export type SayProps = {
   arabic: string; translit: string; mode: "sound" | "reading"; alternatives?: string[];
@@ -72,9 +73,9 @@ export function SayPanel({ arabic, translit, mode, alternatives = [], listen, on
     </>}
     <div className="say-controls">
       {listen && <button className="btn-round" onClick={listen} aria-label={t("listen")}><Volume2 size={20} /></button>}
-      {recorder.recording
+      <MobileAudioControl>{recorder.recording
         ? <button className="btn-mic live" onClick={recorder.stop}><Square size={18} /> {t("stop")}<span className="mic-level" style={{ transform: `scaleX(${0.15 + recorder.level * 0.85})` }} /></button>
-        : <button className="btn-mic" onClick={attempt} disabled={busy || online === false}>{busy ? <Loader2 className="spin" size={18} /> : result ? <RotateCcw size={18} /> : <Mic size={18} />} {result ? t("tryAgain") : t("yourTurn")}</button>}
+        : <button className="btn-mic" onClick={attempt} disabled={busy || online === false}>{busy ? <Loader2 className="spin" size={18} /> : result ? <RotateCcw size={18} /> : <Mic size={18} />} {result ? t("tryAgain") : t("yourTurn")}</button>}</MobileAudioControl>
       {playback && !recorder.recording && <button className="btn-round" onClick={() => void new Audio(playback).play()} aria-label={t("hearYourself")} title={t("hearYourself")}><Headphones size={19} /></button>}
     </div>
     {recorder.recording && <p className="say-status">{t("recording")}</p>}

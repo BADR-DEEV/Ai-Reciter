@@ -35,6 +35,16 @@ cd Ai-Reciter
 The browser opens **http://127.0.0.1:3000** when everything is ready. Press **Ctrl+C** in the
 terminal to stop.
 
+On phones, the app uses a bottom navigation bar. Audio-input screens show a large
+recording button in its centre. The five slots are studio, ayah search, recording,
+challenges and **Menu**. The menu opens home, learning/letters, tajweed, profile
+and other pages. Voice
+search also keeps its decorative listening button in the page content on phones.
+
+Closing the launcher terminal also stops its servers. On Windows, the launcher
+owns both server process trees through a kill-on-close Job Object, including
+children started by npm. Closing only the browser tab leaves the launcher running.
+
 The first run takes 10 to 20 minutes, depending on your connection. It downloads about 3 GB and
 needs about 5 GB of disk space:
 

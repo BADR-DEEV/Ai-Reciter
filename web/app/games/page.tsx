@@ -42,6 +42,7 @@ export default function GamesPage() {
   const notes: Record<ChallengeMode, string> = { next: "تذكّر الآية التالية. اتلُها لملاحظات نصية أو استخدم الخيارات.", audio: "آية واحدة وثلاثة تسجيلات بقالون. اختر المطابق.", surah: "حدّد سورة الآية. نستبعد الآيات المكررة التي تحتمل أكثر من سورة.", missing: "أكمل كلمة ناقصة. لا يتغير نص المصدر.", order: "اختر الترتيب الصحيح لثلاث آيات متتابعة." };
   const [mode, setMode] = useState<ChallengeMode>("next"), [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [scope, setScope] = useState("amma"), [round, setRound] = useState(0);
+  const [fullQuran, setFullQuran] = useState(false);
   // Same surah does not apply to "Find the surah"; the order game has no outside choices at all.
   const [from, setFrom] = useState<ChoiceSource>("scope"), source: ChoiceSource = mode === "surah" && from === "surah" ? "scope" : from;
   const [question, setQuestion] = useState<Challenge | null>(null), [picked, setPicked] = useState<number | null>(null);
@@ -54,6 +55,9 @@ export default function GamesPage() {
   const [adaptive, setAdaptive] = useState(false), [skill, setSkill] = useState<SkillHistory>(emptySkill);
   const answered = useRef("");
   const nextButton = useRef<HTMLButtonElement>(null);
+  const challengeRound = useRef<HTMLDivElement>(null);
+  const scrollToQuestion = useRef(false);
+  const [roundHeight, setRoundHeight] = useState(0);
   const [profileRevision, setProfileRevision] = useState(0);
   useEffect(() => {
     const changed = () => { answered.current = ""; setProfileRevision(n => n + 1); };
@@ -97,12 +101,26 @@ export default function GamesPage() {
     if (right) { setCorrect(n => n + 1); complete(`challenge:${question.id}:${difficulty}`, 1, difficulty === "hard" ? 30 : difficulty === "medium" ? 20 : 10); }
   };
   const nextChallenge = () => {
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      scrollToQuestion.current = true;
+      setRoundHeight(challengeRound.current?.getBoundingClientRect().height || 0);
+    }
     if (adaptive && revealed && outcome !== "review") {
       const next = nextSkill(skill); setSkill(next); setDifficulty(next.difficulty);
       try { localStorage.setItem(`${progressKey()}:adaptive-v1:${skillID}`, JSON.stringify(next)); } catch { /* Optional storage. */ }
     }
     setRound(n => n + 1);
   };
+  useEffect(() => {
+    if (!question || !scrollToQuestion.current) return;
+    scrollToQuestion.current = false;
+    setRoundHeight(0);
+    const frame = requestAnimationFrame(() => {
+      challengeRound.current?.scrollIntoView({ block: "start", behavior: "instant" });
+      challengeRound.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [question]);
   // The answer appears below the choices: bring it into view with "Next" focused, so Enter moves on.
   useEffect(() => {
     if (!revealed || !nextButton.current) return;
@@ -114,12 +132,18 @@ export default function GamesPage() {
     <div className="challenge-modes">{MODES.map(item => <button key={item.id} aria-pressed={mode === item.id} className={`challenge-mode ${mode === item.id ? "selected" : ""}`} onClick={() => setMode(item.id)}><item.icon size={23} /><strong>{c(item.title, titles[item.id])}</strong><span>{c(item.note, notes[item.id])}</span></button>)}</div>
     <section className="challenge-settings"><label>{c("Difficulty", "الصعوبة")}<select aria-label={c("Challenge difficulty", "صعوبة التحدي")} disabled={adaptive} value={difficulty} onChange={e => setDifficulty(e.target.value as Difficulty)}><option value="easy">{c("Gentle · related choices", "سهل · خيارات ذات صلة")}</option><option value="medium">{c("Growing · closer choices", "متوسط · خيارات أقرب")}</option><option value="hard">{c("Focused · near-identical choices", "صعب · خيارات شبه متطابقة")}</option></select></label>
       <label><input type="checkbox" checked={adaptive} onChange={e => setAdaptive(e.target.checked)} />{c("Personalized difficulty · prototype", "صعوبة شخصية · نموذج أولي")}</label>
-      <label>{c("Reading scope", "نطاق القراءة")}<select aria-label={c("Challenge scope", "نطاق التحدي")} value={scope} onChange={e => setScope(e.target.value)}><option value="amma">{c("Fātiḥah + Juz ʿAmma", "الفاتحة وجزء عمّ")}</option><option value="all">{c("Whole Quran · ASR experimental", "القرآن كاملًا · التعرف الصوتي تجريبي")}</option></select></label>
-      {mode !== "order" && <label>{c("Choices from", "الخيارات من")}<select aria-label={c("Where wrong answers come from", "مصدر الخيارات الخاطئة")} value={source} onChange={e => setFrom(e.target.value as ChoiceSource)}>{mode !== "surah" && <option value="surah">{c("Same surah", "السورة نفسها")}</option>}<option value="scope">{c("Reading scope", "نطاق القراءة")}</option><option value="quran">{c("Whole Quran", "القرآن كله")}</option></select></label>}
+      <label>{c("Reading scope", "نطاق القراءة")}<select aria-label={c("Challenge scope", "نطاق التحدي")} value={scope} onChange={e => setScope(e.target.value)}><option value="amma">{c("Fātiḥah + Juz ʿAmma", "الفاتحة وجزء عمّ")}</option>{fullQuran && <option value="all">{c("Whole Quran · ASR experimental", "القرآن كاملًا · التعرف الصوتي تجريبي")}</option>}</select></label>
+      {mode !== "order" && <label>{c("Choices from", "الخيارات من")}<select aria-label={c("Where wrong answers come from", "مصدر الخيارات الخاطئة")} value={source} onChange={e => setFrom(e.target.value as ChoiceSource)}>{mode !== "surah" && <option value="surah">{c("Same surah", "السورة نفسها")}</option>}<option value="scope">{c("Reading scope", "نطاق القراءة")}</option>{fullQuran && <option value="quran">{c("Whole Quran", "القرآن كله")}</option>}</select></label>}
       <ReciterSelector value={reciter} onChange={selectReciter} />
-      <label><input type="checkbox" checked={phonetics} onChange={e => setPhonetics(e.target.checked)} />{c("Transliteration (draft phonetic aid)", "نقل صوتي بالحروف اللاتينية (تجريبي)")}</label></section>
+      <label><input type="checkbox" checked={phonetics} onChange={e => setPhonetics(e.target.checked)} />{c("Transliteration (draft phonetic aid)", "نقل صوتي بالحروف اللاتينية (تجريبي)")}</label>
+      <label><input type="checkbox" checked={fullQuran} onChange={event => {
+        setFullQuran(event.target.checked);
+        if (!event.target.checked) { setScope("amma"); if (from === "quran") setFrom("scope"); }
+      }} />{c("Enable full Quran · work in progress", "فعّل القرآن كاملًا · قيد التطوير")}</label></section>
+    {fullQuran && <p className="safety-note" role="status">{c("Full-Quran recognition is currently a work in progress. The speech model was trained on Al-Fātiḥah and Juz ʿAmma; audio feedback for other surahs is experimental.", "التعرّف على تلاوة القرآن كاملًا قيد التطوير حاليًا. دُرّب النموذج الصوتي على الفاتحة وجزء عمّ؛ والملاحظات الصوتية في بقية السور تجريبية.")}</p>}
     {adaptive && <p className="safety-note">{c("Difficulty changes on the next question from your recent choice answers—not XP or ASR confidence. Closer alternatives follow steady success; mistakes bring gentler practice. Local, explainable policy; not a trained learner model.", "تتغير الصعوبة في السؤال التالي وفق إجابات الخيارات الأخيرة، لا النقاط ولا ثقة التعرف الصوتي. تقارب البدائل بعد النجاح المستمر، وتيسيرها بعد الأخطاء. سياسة محلية قابلة للتفسير وليست نموذج تعلم مدرّبًا.")}</p>}
     <p className="safety-note">{c("Reference audio uses your selected Qālūn reader, default Al-Huthaify, currently Fātiḥah/Juz ʿAmma. No altered Quran audio or silent voice substitution. AI text feedback and Latin aids do not certify tajweed.", "الاستماع بصوت قارئ قالون الذي تختاره، والافتراضي الحذيفي؛ المتاح حاليًا الفاتحة وجزء عمّ. لا نغيّر الصوت القرآني ولا نستبدل القارئ بصمت. الملاحظات النصية والنقل الصوتي لا يثبتان صحة التجويد.")}</p>
+    <div ref={challengeRound} className="challenge-round" tabIndex={-1} style={{ minHeight: roundHeight || undefined }}>
     {error ? <section className="challenge-card"><p role="alert">{c(error, "تعذّر تجهيز التحدي أو تشغيل المقطع. اختر نوعًا آخر أو حاول مجددًا.")}</p><button className="btn-primary" onClick={() => setRound(n => n + 1)}>{c("Try again", "حاول مجددًا")}</button></section> : !question ? <p role="status">{c("Preparing a Qālūn challenge…", "جارٍ تجهيز تحدٍّ بقالون…")}</p> : <section className="challenge-card">
       <div className="challenge-question-head"><span className="hero-kicker">{c(MODES.find(m => m.id === mode)!.title, titles[mode])}</span><span>{question.reference}</span></div>
       <p className={mode === "order" ? "" : "challenge-ayah"} lang={mode === "order" ? lang : "ar"} dir={mode === "order" && lang === "en" ? "ltr" : "rtl"}>{question.prompt}</p>
@@ -144,6 +168,6 @@ export default function GamesPage() {
         <p>{question.explanation}</p><p className="challenge-ayah" lang="ar" dir="rtl">{question.target}</p>
         {phonetics && <PhoneticAid text={question.target} />}<a className="btn-quiet" href={`/studio?surah=${question.surah}`}>{c("Practice this surah in the studio", "تدرّب على هذه السورة في الاستوديو")}</a><TafsirPanel surah={question.surah} ayah={question.ayah} /></div>}
       <small className="similarity-note">{c("Distractor method:", "طريقة اختيار البدائل:")} {question.similarity}. {c("XP is practice progress, not religious competency.", "النقاط للتقدّم التدريبي، وليست حكمًا على الإتقان الديني.")}</small>
-    </section>}
+    </section>}</div>
   </main></div>;
 }
