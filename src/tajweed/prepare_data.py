@@ -6,9 +6,10 @@ text and then "hears" them everywhere (the Evaluating-ASR report measured a
 
 1. Plain readings: MMS Arabic TTS (facebook/mms-tts-ara, CC-BY-NC-4.0) reads
    every ayah without tajweed, in several takes with different seeds and
-   speaking rates. A take is kept only when rattil-v4 recognises its words
-   (WER <= --max-wer). Rows carry "tajweed": false, so targets.py gives them
-   targets with no tajweed tokens.
+   speaking rates. A take is kept only when rattil-v4 reads it closely enough
+   (character error <= --max-cer; v4 has only heard sheikhs, so word error on
+   flat TTS speech is high even when the letters are right). Rows carry
+   "tajweed": false, so targets.py gives them targets with no tajweed tokens.
 2. Sheikh Waleed (never trained on): a copy with labels from the current
    normalizer, for testing on an unseen voice. Al-Fātiḥah is left out because
    its labels are shifted by one ayah.
@@ -69,12 +70,25 @@ def synthesize(ayahs, out, takes, seed):
     return rows
 
 
-def recognise(rows, folder, model_dir, batch=16):
-    """Word error of rattil-v4 on each take (the takes it cannot read are dropped)."""
+def rows_from_audio(folder, ayahs):
+    """Rebuild the take rows from audio already synthesized (SSSAAA_take.wav)."""
+    rows = []
+    for path in sorted((folder / "audio").glob("*.wav")):
+        surah, ayah, take = int(path.stem[:3]), int(path.stem[3:6]), int(path.stem.split("_")[1])
+        raw, label = ayahs[(surah, ayah)]
+        rows.append({"surah": surah, "ayah": ayah, "source_ayahs": [ayah], "relative_audio_path": f"audio/{path.name}",
+                     "text_raw_uthmani": raw, "text_asr_normalized": label, "reciter": "MMS-TTS plain reading (no tajweed)",
+                     "reciter_key": "ttsplain", "tajweed": False, "duration_seconds": round(sf.info(path).duration, 3),
+                     "tts_rate": RATES[take % len(RATES)], "quality_flags": []})
+    return rows
+
+
+def recognise(rows, folder, model_dir, batch=8):
+    """Word and character error of rattil-v4 on each take (greedy on CPU: batched beam search hangs on MPS)."""
     import jiwer
     import torch
     from transformers import WhisperForConditionalGeneration, WhisperProcessor
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    device = "cpu"
     processor = WhisperProcessor.from_pretrained(model_dir)
     model = WhisperForConditionalGeneration.from_pretrained(model_dir).to(device).eval()
     for start in range(0, len(rows), batch):
@@ -83,9 +97,12 @@ def recognise(rows, folder, model_dir, batch=16):
         features = processor(audio, sampling_rate=16000, return_tensors="pt").input_features.to(device)
         with torch.no_grad():
             ids = model.generate(features, language="arabic", task="transcribe", max_new_tokens=200)
+        if start % 200 == 0:
+            print(f"  checked {start}/{len(rows)} takes", flush=True)
         for row, text in zip(part, processor.batch_decode(ids, skip_special_tokens=True)):
             row["v4_transcript"] = normalize_quran_for_asr(text)
             row["v4_wer"] = round(jiwer.wer(row["text_asr_normalized"], row["v4_transcript"] or "-"), 3)
+            row["v4_cer"] = round(jiwer.cer(row["text_asr_normalized"], row["v4_transcript"] or "-"), 3)
     return rows
 
 
@@ -113,21 +130,21 @@ def main():
     parser.add_argument("--waleed", type=Path)
     parser.add_argument("--out", type=Path, default=ROOT / "data/tajweed")
     parser.add_argument("--takes", type=int, default=3, help="TTS takes per ayah (different seed and speaking rate)")
-    parser.add_argument("--max-wer", type=float, default=0.25)
+    parser.add_argument("--max-cer", type=float, default=0.25)
     parser.add_argument("--model", type=Path, default=ROOT / "runs/rattil_qaloon_v4")
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--reuse-audio", action="store_true", help="Skip synthesis and check the takes already in --out")
     args = parser.parse_args()
     ayahs = corpus_ayahs(args.reader_root)
     folder = args.out / "dataset_qaloon_ttsplain"
     print(f"{len(ayahs)} ayahs; {args.takes} plain takes each → {folder}")
-    rows = recognise(synthesize(ayahs, folder, args.takes, args.seed), folder, args.model)
-    kept = [r for r in rows if r["v4_wer"] <= args.max_wer]
-    for r in rows:
-        if r not in kept:
-            (folder / r["relative_audio_path"]).unlink(missing_ok=True)
+    takes = rows_from_audio(folder, ayahs) if args.reuse_audio else synthesize(ayahs, folder, args.takes, args.seed)
+    rows = recognise(takes, folder, args.model)
+    kept = [r for r in rows if r["v4_cer"] <= args.max_cer]
+    (folder / "all_takes.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
     (folder / "metadata.jsonl").write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in kept), encoding="utf-8")
-    print(f"Plain negatives: kept {len(kept)}/{len(rows)} takes with v4 WER <= {args.max_wer} "
-          f"(mean WER of kept {np.mean([r['v4_wer'] for r in kept]):.3f})")
+    print(f"Plain negatives: kept {len(kept)}/{len(rows)} takes with v4 CER <= {args.max_cer} "
+          f"(kept: mean CER {np.mean([r['v4_cer'] for r in kept]):.3f}, mean WER {np.mean([r['v4_wer'] for r in kept]):.3f})")
     if args.waleed:
         waleed_copy(args.waleed, args.out, ayahs)
 

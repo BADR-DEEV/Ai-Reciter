@@ -269,6 +269,19 @@ def add_extra_tokens(model, tokenizer, tokens):
     return tokenizer.convert_tokens_to_ids(tokens)
 
 
+def capped_macro_wer(details):
+    """Macro-over-reciters WER where a clip contributes at most as many errors as it has words."""
+    import jiwer
+    per = {}
+    for row in details:
+        words = max(1, len(row["reference"].split()))
+        errors = min(words, jiwer.wer(row["reference"], row["prediction"] or "-") * words)
+        total = per.setdefault(row["reciter"], [0.0, 0])
+        total[0] += errors
+        total[1] += words
+    return sum(e / n for e, n in per.values()) / max(1, len(per))
+
+
 def strip_tags(text):
     """Tags never count as words: remove them before WER."""
     return " ".join(TAG_PATTERN.sub(" ", text).split())
@@ -499,8 +512,10 @@ def main(argv=None, **defaults):
         if tagged:
             tags = tag_scores([(row[args.label_field], text) for row, text in zip(splits["validation"], hypotheses)], normalize_word)
             metrics.update({f"tag_{k}": tags[k] for k in ("precision", "recall", "f1") if tags[k] is not None})
-            # Tags must improve without trading away word accuracy (a looping epoch can spike WER).
-            metrics["tajweed_score"] = (tags["f1"] or 0.0) - scores["macro_reciter_wer"]
+            # Tags must improve without trading away word accuracy. Each clip's errors are capped at its
+            # length, so one runaway repetition (73x one word) cannot outweigh the other 500 clips.
+            metrics["capped_macro_wer"] = capped_macro_wer(details)
+            metrics["tajweed_score"] = (tags["f1"] or 0.0) - metrics["capped_macro_wer"]
         return metrics
 
     training_args = Seq2SeqTrainingArguments(

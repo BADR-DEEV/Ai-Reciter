@@ -70,9 +70,10 @@ and the scores below rank their partners among all 4,114 verses.
 
 At the 256 dimensions the index stores, recall@10 rises by 30% and MRR by 28%
 on verses the model never trained on. Training takes about 6 minutes on an M-series
-Mac. The model and its card (`rattil_training.json`) stay in `runs/`, which is
-Git-ignored, so a fresh clone builds the index from the base model until the
-fine-tune is run or published.
+Mac. It is published privately as
+[`Mathani-Ayat/rattil-ayah-embed`](https://huggingface.co/Mathani-Ayat/rattil-ayah-embed):
+`python src/deployment/pull_hf_assets.py --models ayah-embed` puts it in `runs/rattil_ayah_embed/`
+(Git-ignored). Without it, the index is built from the base model.
 
 ## Ranking a candidate
 

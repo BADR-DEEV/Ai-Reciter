@@ -12,8 +12,8 @@ import torch
 
 from .augment import (PROFILES, SAMPLE_RATE, Augmenter, build_config, colored_noise, configure_spec_augment,
                       mix_at_snr, synthetic_rir, tempo_perturb, add_snr_noise, vtlp, vtlp_warp)
-from .train_base_full import (AugmentedAyahDataset, add_extra_tokens, apply_label_overrides, load_label_overrides,
-                              strip_tags, tag_scores, word_tags)
+from .train_base_full import (AugmentedAyahDataset, add_extra_tokens, apply_label_overrides, capped_macro_wer,
+                              load_label_overrides, strip_tags, tag_scores, word_tags)
 
 EVERY_OP = replace(PROFILES["speaker-robust"], clean_prob=0.0, tempo_prob=1.0, pitch_prob=1.0, vtlp_prob=1.0, reverb_prob=1.0,
                    eq_prob=1.0, band_prob=1.0, noise_prob=1.0, gain_prob=1.0, clip_prob=1.0, codec_prob=1.0, other_voice_prob=1.0)
@@ -234,6 +234,12 @@ class TargetTests(unittest.TestCase):
         deleted = tag_scores([("a<tj:x> b<tj:y>", "a<tj:x>")])
         self.assertEqual((deleted["precision"], deleted["recall"]), (1.0, .5))
         self.assertIsNone(tag_scores([("a b", "a b")])["precision"])
+
+    def test_one_looping_clip_cannot_dominate_the_selection_wer(self):
+        rows = [{"reciter": "a", "reference": "x y", "prediction": "x y " + "z " * 70},
+                *[{"reciter": "a", "reference": "x y", "prediction": "x y"}] * 9,
+                {"reciter": "b", "reference": "x y", "prediction": "x"}]
+        self.assertAlmostEqual(capped_macro_wer(rows), (2 / 20 + 1 / 2) / 2)
 
 
 def tiny_whisper(folder):
