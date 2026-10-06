@@ -6,7 +6,8 @@ import { referenceURL, RECITERS, type ReciterID } from "@/lib/reciters";
 import { useLang } from "@/lib/i18n";
 import { ReaderAudioNotice } from "@/components/reader-audio-notice";
 import { validTimings, wordAtTime, type PlaybackCursor, type PlaybackTiming } from "@/lib/playback";
-export function AyahListen({ surah, ayah, reciter, disabled = false, displayText, onPlayback }: { surah: number; ayah: number; reciter: ReciterID; disabled?: boolean; displayText?: string; onPlayback?: (ayah: number, cursor: PlaybackCursor | null) => void }) {
+/** `compact`: a small round play button that sits inline after the ayah number. */
+export function AyahListen({ surah, ayah, reciter, disabled = false, displayText, onPlayback, compact = false }: { surah: number; ayah: number; reciter: ReciterID; disabled?: boolean; displayText?: string; onPlayback?: (ayah: number, cursor: PlaybackCursor | null) => void; compact?: boolean }) {
   const { lang, c } = useLang();
   const [state, setState] = useState<"idle" | "loading" | "playing" | "failed">("idle");
   const version = useRef(0);
@@ -17,7 +18,7 @@ export function AyahListen({ surah, ayah, reciter, disabled = false, displayText
   useEffect(() => { setState("idle"); return () => { version.current++; if (playing.current) { stopAudio(); callback.current?.(ayah, null); } playing.current = false; }; }, [surah, ayah, reciter, disabled]);
   const reader = RECITERS.find(r => r.id === reciter)!;
   const name = lang === "ar" ? reader.arabic : reader.name;
-  return <div className="ayah-listen"><button className="btn-listen" disabled={disabled} aria-label={c(`Listen to ayah ${ayah}`, `استمع إلى الآية ${ayah}`)} onClick={async () => {
+  return <div className={`ayah-listen ${compact ? "compact" : ""}`} dir={compact ? (lang === "ar" ? "rtl" : "ltr") : undefined}><button className="btn-listen" disabled={disabled} aria-label={c(`Listen to ayah ${ayah}`, `استمع إلى الآية ${ayah}`)} title={compact ? c(`Listen · ${name}`, `استمع · ${name}`) : undefined} onClick={async () => {
     const token = ++version.current;
     if (state === "loading" || state === "playing") { stopAudio(); playing.current = false; callback.current?.(ayah, null); setState("idle"); return; }
     setState("loading"); playing.current = true;
@@ -34,8 +35,8 @@ export function AyahListen({ surah, ayah, reciter, disabled = false, displayText
         callback.current?.(ayah, { ayah, word: valid ? wordAtTime(timing!.words, seconds) : null, tracking: valid ? "word" : "ayah" });
       });
     if (version.current === token) { playing.current = false; callback.current?.(ayah, null); setState(result === "failed" ? "failed" : "idle"); }
-  }}>{state === "loading" ? <Loader2 size={16} className="spin" /> : state === "playing" ? <Square size={15} /> : <Mic2 size={17} />}
-    {state === "loading" ? c("Loading…", "جارٍ التحميل…") : state === "playing" ? c("Stop", "إيقاف") : c(`Listen · ${name}`, `استمع · ${name}`)}</button>
+  }}>{state === "loading" ? <Loader2 size={16} className="spin" /> : state === "playing" ? <Square size={compact ? 13 : 15} /> : <Mic2 size={compact ? 15 : 17} />}
+    <span className={compact ? "sr-only" : undefined}>{state === "loading" ? c("Loading…", "جارٍ التحميل…") : state === "playing" ? c("Stop", "إيقاف") : c(`Listen · ${name}`, `استمع · ${name}`)}</span></button>
     {state === "failed" && <ReaderAudioNotice reciter={reciter} />}
     {state === "playing" && <small className="playback-tracking" role="status">{tracking === "word" ? c("Word tracking · machine timing draft", "متابعة الكلمات · توقيت آلي تجريبي") : c("Ayah tracking · word timings unavailable", "متابعة الآية · توقيت الكلمات غير متاح")}</small>}
   </div>;

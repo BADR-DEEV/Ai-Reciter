@@ -54,3 +54,26 @@ test("invalid uploads show a useful error and allow retry", async ({ page }) => 
   await expect(page.locator(".error-message")).toContainText("Cannot decode this audio file");
   await expect(page.getByRole("button", { name: "Upload audio to test" })).toBeEnabled();
 });
+
+test("memorize hides each word until it is heard or hinted", async ({ page }) => {
+  await page.goto("/studio");
+  await page.getByLabel("Hide ayahs to memorize").check();
+  await expect(page.getByRole("button", { name: "Mushaf", exact: true })).toBeDisabled();
+  const words = page.locator('.text-ayah[data-ayah="1"] .quran-word');
+  const hidden = "rgba(0, 0, 0, 0)";
+  await expect(words.nth(0)).toHaveCSS("color", hidden);
+  await expect(page.locator(".basmalah .quran-word").first()).not.toHaveCSS("color", hidden);
+  await page.getByRole("button", { name: "Hint: show the next word" }).click();
+  await expect(words.nth(0)).toHaveClass(/hinted/);
+  await expect(words.nth(0)).not.toHaveCSS("color", hidden);
+  await expect(words.nth(1)).toHaveCSS("color", hidden);
+  await expect(page.getByText("1 hint used")).toBeVisible();
+  await page.getByRole("button", { name: "Try the presentation demo" }).click();
+  // Heard words appear; a missed word appears too (in red) so the learner sees what was skipped.
+  await expect(words.nth(0)).toHaveAttribute("data-status", "correct");
+  await expect(words.nth(1)).toHaveAttribute("data-status", "missed");
+  await expect(words.nth(1)).not.toHaveCSS("color", hidden);
+  await expect(words.nth(3)).toHaveCSS("color", hidden);
+  await page.reload();
+  await expect(page.getByLabel("Hide ayahs to memorize")).toBeChecked();
+});

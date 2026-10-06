@@ -124,3 +124,45 @@ html[dir="rtl"] .studio-shell .eyebrow{letter-spacing:0}
 }
 .reader-audio-note{display:inline-flex;align-items:center;gap:6px}.ayah-listen small.reader-audio-note{color:var(--muted)}
 .reader-audio-ask{display:flex;flex-direction:column;align-items:flex-start;gap:6px;max-width:420px}.reader-audio-ask .btn-quiet{font-size:12px;padding:7px 12px}
+
+/* Ayah view: full ink until a session starts (grey then means "not reached yet"),
+   compact rows, one frame, and a small play button right after each ayah number. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.studio-shell .quran-paper{border-color:#ebe5d2;border-radius:12px;background-image:none}
+.studio-shell .quran-paper:before{display:none}
+.studio-shell .surah-heading{gap:28px;padding:4px 0 6px}
+.studio-shell .surah-heading h2{font-size:32px;color:var(--deep)}
+.studio-shell .surah-caption{display:block;margin-bottom:6px;font-size:11px;letter-spacing:.04em;color:#8d8462}
+.studio-shell .surah-heading h2{line-height:1.8}
+.studio-shell .surah-heading>div>span:last-child{font-size:13px;letter-spacing:0;color:#8d8462}
+.studio-shell .basmalah{margin:8px 0 6px;font-size:26px;color:var(--deep)}
+.studio-shell .basmalah .quran-word.pending{color:inherit}
+.studio-shell .text-mushaf{padding:4px 0 8px;color:var(--deep)}
+.studio-shell .text-mushaf .quran-word.pending{color:inherit}
+.studio-shell .text-mushaf.session .quran-word.pending{color:#9aa197}
+.studio-shell .text-mushaf .text-ayah{margin:0;padding:8px 14px 10px;border-bottom:1px solid #efeadb;border-inline-start:3px solid transparent;border-radius:0;cursor:pointer;transition:background .2s,border-color .2s}
+.studio-shell .text-mushaf .text-ayah:last-child{border-bottom:0}
+.studio-shell .text-mushaf .text-ayah:hover{background:#faf7ee}
+.studio-shell .text-mushaf .text-ayah.focused{border-inline-start-color:#cdbb86;background:#fbf9f1}
+.studio-shell .ayah-reading-line{font-size:30px;line-height:2.15}
+.ayah-listen.compact{display:inline-flex;flex-wrap:wrap;gap:6px;max-width:100%;margin:0 6px;vertical-align:.25em}
+.ayah-listen.compact .btn-listen{width:32px;height:32px;padding:0;gap:0;justify-content:center;border-radius:50%;border-color:#e2dcc6;background:#fffefa;color:#8a7a4d}
+.ayah-listen.compact .btn-listen:hover:not(:disabled){border-color:#b9d3bf;background:var(--mint);color:var(--green)}
+.text-ayah.playback-ayah .ayah-listen.compact .btn-listen{border-color:var(--green);background:var(--green);color:#fff}
+.ayah-listen.compact small,.ayah-listen.compact .reader-audio-ask{flex-basis:100%;font-size:12px;line-height:1.5}
+@media (max-width:560px){.studio-shell .ayah-reading-line{font-size:26px}.studio-shell .text-mushaf .text-ayah{padding-inline:8px}}
+
+/* Memorize: unheard words are soft ink bars of their own width until heard or hinted;
+   missed words come back in red when the ayah ends. */
+.memorize .text-mushaf .quran-word.pending:not(.hinted),.memorize .current-text .quran-word.pending:not(.hinted){color:transparent!important;background:linear-gradient(#e6dfc8,#e6dfc8) center/100% .5em no-repeat;border-radius:999px;user-select:none;pointer-events:none}
+.memorize .text-mushaf .quran-word.pending:not(.hinted) *,.memorize .current-text .quran-word.pending:not(.hinted) *{color:transparent!important;text-decoration:none!important}
+.memorize .text-mushaf .quran-word.playback-word.pending:not(.hinted){background-image:linear-gradient(#bcd6be,#bcd6be)}
+.memorize .text-mushaf .quran-word.hinted.pending,.memorize .current-text .quran-word.hinted.pending{color:#8a7a4d;text-decoration:underline dotted #c9b98a;text-underline-offset:8px}
+.memorize .text-mushaf .quran-word.correct{animation:memorize-reveal .35s ease-out}
+@keyframes memorize-reveal{from{opacity:0;filter:blur(3px)}}
+.memorize-note{display:flex;align-items:flex-start;gap:8px;max-width:640px;margin:0 auto 10px;padding:9px 14px;border-radius:10px;background:#f6f1e1;color:#6f6440;font:13px/1.55 'DM Sans',sans-serif;text-align:start}
+.memorize-note svg{margin-top:2px}
+.ayah-meaning-pane .memorize-tafsir-note,.memorize-tafsir-note{padding:12px 0;font-size:12px;line-height:1.6;color:#6b766e;border-top:1px solid var(--line)}
+.memorize-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:10px;font-size:12px;color:#6b766e}
+.memorize-tools .btn-quiet{padding:7px 12px;font-size:12px}
+@media (prefers-reduced-motion:reduce){.memorize .text-mushaf .quran-word.correct{animation:none}}

@@ -77,8 +77,9 @@ python -m src.streaming.serve --model rattil-v3
 cd web && npm install && npx next dev --hostname 127.0.0.1 -p 3000
 ```
 
-Pages: `/` course, `/learn`, `/studio`, `/tajweed` (letter sounds, rules, Qālūn topics),
-`/games`, `/profile`, and `/dev` (dev mode only).
+Pages: `/` course, `/learn`, `/studio` (with a "Hide ayahs to memorize" mode), `/search`
+(find an ayah by reciting it, see `docs/QURAN_SEARCH.md`), `/tajweed` (letter sounds, rules,
+Qālūn topics), `/games`, `/profile`, and `/dev` (dev mode only).
 
 Tajweed colors need `web/public/quran/tajweed/`. The first start builds it; to rebuild after
 changing rules run `python -m src.tajweed.build` (about 7 s). See `docs/QALOON_TAJWEED.md`.
