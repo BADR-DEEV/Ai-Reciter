@@ -16,7 +16,7 @@ import threading
 
 import numpy as np
 
-from .matcher import alignment, normalize_quran_for_asr, words
+from .matcher import OPENING_PHRASES, alignment, normalize_quran_for_asr, words
 
 # First ayah of each juzʾ in this app's Qālūn (Madanī) numbering: the standard Ḥafṣ
 # boundaries carried over through web/public/quran/text-mapping.json.
@@ -25,8 +25,9 @@ JUZ_STARTS = ((1, 1), (2, 141), (2, 251), (3, 93), (4, 24), (4, 147), (5, 84), (
               (9, 94), (11, 6), (12, 53), (15, 1), (17, 1), (18, 74), (21, 1), (23, 1), (25, 21), (27, 58),
               (29, 46), (33, 31), (36, 27), (39, 31), (41, 46), (46, 1), (51, 31), (58, 1), (67, 1), (78, 1))
 # Recited before many passages but part of none (the basmalah is not a numbered Qālūn ayah).
-OPENINGS = (("taawwudh", tuple(words("أعوذ بالله من الشيطان الرجيم"))),
-            ("basmala", tuple(words("بسم الله الرحمن الرحيم"))))
+# The live tracker strips the same phrases (matcher.opening_length); search also names them
+# for the page and allows additions such as «السميع العليم» inside the taʿawwudh.
+OPENINGS = tuple(zip(("taawwudh", "basmala"), (tuple(words(phrase)) for phrase in OPENING_PHRASES)))
 MAX_WORDS = 90      # ~30 s of recitation; longer transcripts are cut, never searched slowly
 BUCKET = 4          # words per diagonal bucket when voting
 SEEDS = 24          # candidate places aligned exactly
