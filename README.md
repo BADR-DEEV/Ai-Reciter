@@ -70,6 +70,7 @@ Later runs skip what is already there and start in under a minute.
 | `--check` | Start everything, confirm both servers answer, then stop |
 | `--no-browser` | Do not open the browser |
 | `--skip-models` | Do not download models; only the web app starts (no recitation checks) |
+| `--public-url https://…` | Run on a server behind HTTPS (see [Run it on a server](#run-it-on-a-server)) |
 
 Pass them to any of the commands, for example `./run.sh --beams 1` or `run.bat --beams 1`.
 
@@ -88,6 +89,28 @@ Pass them to any of the commands, for example `./run.sh --beams 1` or `run.bat -
 - **Recognition is slow.** Use `--beams 1`. The model runs on the CPU unless you have an NVIDIA GPU.
 - **Start over.** Delete `.venv` (Python packages) or `web/node_modules` (web packages) and run
   again. Downloaded models live in `runs/` and data in `data/` and `web/public/quran/`.
+
+## Run it on a server
+
+On a Linux server (Ubuntu 24.04 tested, 2+ vCPUs and 4 GB RAM; no GPU needed) install `python3-venv`,
+Node.js 22 and [Caddy](https://caddyserver.com/docs/install), log in to Hugging Face
+(`HF_TOKEN` or `~/.cache/huggingface/token`), open ports 80 and 443, then:
+
+```bash
+python3 run.py --setup-only
+# Replace RATTIL_HOST with your domain, or <ip-with-dashes>.sslip.io without one
+sed "s/RATTIL_HOST/rattil.example.com/" deploy/Caddyfile | sudo tee /etc/caddy/Caddyfile && sudo systemctl reload caddy
+sed "s/RATTIL_HOST/rattil.example.com/" deploy/rattil.service | sudo tee /etc/systemd/system/rattil.service
+sudo systemctl daemon-reload && sudo systemctl enable --now rattil
+```
+
+Caddy gets the HTTPS certificate (browsers need HTTPS for the microphone) and sends the recognition
+API's paths to port 8000 and everything else to the web app on 3000. `--public-url` points the
+browser's WebSocket at that address and allows it as an origin. Logs: `journalctl -u rattil -f`.
+
+Every push to `main` deploys to the team's EC2 server (`.github/workflows/deploy.yml`): GitHub signs in
+to AWS with OIDC (no stored secrets), Systems Manager checks out the commit on the server and
+`deploy/update.sh` restarts Rattil, which is down for a minute or two while it rebuilds.
 
 ## Run the parts by hand
 

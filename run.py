@@ -324,6 +324,8 @@ def main():
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto", help="Where the model runs (auto: an NVIDIA GPU if present, else CPU)")
     parser.add_argument("--beams", type=int, choices=[1, 3, 5], default=3, help="Beam search width: 3 is more accurate, 1 is faster on slow computers")
     parser.add_argument("--no-browser", action="store_true", help="Do not open the browser")
+    parser.add_argument("--public-url", help="Server deployment: the HTTPS address users open (e.g. https://rattil.example.com). "
+                        "A reverse proxy must send /ws/recite, /health, /api/practice and /api/search to the API (see deploy/Caddyfile)")
     args = parser.parse_args()
     # Ctrl+C, Ctrl+Break and closing the terminal must all stop the servers, however run.py was launched.
     for name in ("SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"):
@@ -340,8 +342,11 @@ def main():
         return
 
     web_url = f"http://127.0.0.1:{args.web_port}"
-    api_env = child_env(RECITER_ALLOWED_ORIGINS=f"{web_url},http://localhost:{args.web_port}")
-    web_env = child_env(NEXT_PUBLIC_RECITER_WS=f"ws://127.0.0.1:{args.api_port}/ws/recite", RATTIL_PYTHON=str(venv_python()))
+    public = (args.public_url or "").rstrip("/")
+    # Behind the proxy the browser reaches the API on the same origin (https -> wss).
+    socket_url = f"{public.replace('http', 'ws', 1)}/ws/recite" if public else f"ws://127.0.0.1:{args.api_port}/ws/recite"
+    api_env = child_env(RECITER_ALLOWED_ORIGINS=",".join([web_url, f"http://localhost:{args.web_port}"] + [public] * bool(public)))
+    web_env = child_env(NEXT_PUBLIC_RECITER_WS=socket_url, RATTIL_PYTHON=str(venv_python()))
     with_api = model_present(MODELS[0][1])
     if not with_api:
         say("No recognition model: starting the web app only (recitation checks are off).")
@@ -365,8 +370,8 @@ def main():
         if args.check:
             say("Check passed: " + ("the API and the web app answer." if with_api else "the web app answers."))
             return
-        say(f"Rattil is running at {web_url}  (Ctrl+C to stop)")
-        if not args.no_browser:
+        say(f"Rattil is running at {public or web_url}  (Ctrl+C to stop)")
+        if not args.no_browser and not public:
             webbrowser.open(web_url)
         while all(p.poll() is None for p in processes):
             time.sleep(1)

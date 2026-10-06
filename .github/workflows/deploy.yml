@@ -1,0 +1,51 @@
+name: Deploy
+# Every push to main goes live on the EC2 server (README: "Run it on a server"). GitHub signs in to AWS
+# with OIDC; the role only trusts pushes to main of this repo and may only run commands on this instance,
+# through Systems Manager, so there is no SSH key, secret or open port. The server checks out the commit
+# and deploy/update.sh restarts Rattil and waits for it.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: eu-north-1
+  INSTANCE_ID: i-069df25cac9893190
+  APP_DIR: /home/ubuntu/Ai-Reciter
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::311208285328:role/rattil-github-deploy
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Update the server and restart Rattil
+        run: |
+          commands=$(jq -nc --arg dir "$APP_DIR" --arg sha "$GITHUB_SHA" '{commands: [
+            "set -e",
+            "sudo -u ubuntu -H git -C \($dir) fetch --quiet origin main",
+            "sudo -u ubuntu -H git -C \($dir) reset --quiet --hard \($sha)",
+            "bash \($dir)/deploy/update.sh"], executionTimeout: ["900"]}')
+          id=$(aws ssm send-command --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript \
+            --comment "Deploy ${GITHUB_SHA::7}" --parameters "$commands" --query Command.CommandId --output text)
+          echo "Systems Manager command $id"
+          while true; do
+            sleep 10
+            status=$(aws ssm get-command-invocation --command-id "$id" --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)
+            case "$status" in Pending|InProgress|Delayed) continue ;; esac
+            aws ssm get-command-invocation --command-id "$id" --instance-id "$INSTANCE_ID" \
+              --query '[StandardOutputContent, StandardErrorContent]' --output text
+            [ "$status" = Success ] && exit 0
+            echo "::error::Deploy $status"; exit 1
+          done

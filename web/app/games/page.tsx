@@ -40,7 +40,7 @@ export default function GamesPage() {
   const { reciter, selectReciter } = useReferenceReciter();
   const titles: Record<ChallengeMode, string> = { next: "ما الآية التالية؟", audio: "استمع وطابق", surah: "حدّد السورة", missing: "أكمل الكلمة", order: "ترتيب الآيات" };
   const notes: Record<ChallengeMode, string> = { next: "تذكّر الآية التالية. اتلُها لملاحظات نصية أو استخدم الخيارات.", audio: "آية واحدة وثلاثة تسجيلات بقالون. اختر المطابق.", surah: "حدّد سورة الآية. نستبعد الآيات المكررة التي تحتمل أكثر من سورة.", missing: "أكمل كلمة ناقصة. لا يتغير نص المصدر.", order: "اختر الترتيب الصحيح لثلاث آيات متتابعة." };
-  const [mode, setMode] = useState<ChallengeMode>("next"), [difficulty, setDifficulty] = useState<Difficulty>("easy");
+  const [mode, setMode] = useState<ChallengeMode>("next"), [difficulty, setDifficulty] = useState<Difficulty>("hard");
   const [scope, setScope] = useState("amma"), [round, setRound] = useState(0);
   const [fullQuran, setFullQuran] = useState(false);
   // Same surah does not apply to "Find the surah"; the order game has no outside choices at all.
