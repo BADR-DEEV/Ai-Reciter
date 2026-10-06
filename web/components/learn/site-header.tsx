@@ -5,7 +5,7 @@ import { useLang } from "@/lib/i18n";
 import { DEV_MODE } from "@/lib/dev-mode";
 import { streak, useProgress } from "@/lib/learn/progress";
 
-export function SiteHeader({ active, children }: { active: "home" | "learn" | "games" | "profile" | "studio" | "tajweed" | "dev"; children?: React.ReactNode }) {
+export function SiteHeader({ active, children }: { active: "home" | "learn" | "games" | "profile" | "studio" | "search" | "tajweed" | "dev"; children?: React.ReactNode }) {
   const { t, toggle, lang } = useLang();
   const { progress, loaded } = useProgress();
   const days = streak(progress.days);
@@ -15,6 +15,7 @@ export function SiteHeader({ active, children }: { active: "home" | "learn" | "g
       <a href="/" aria-current={active === "home" ? "page" : undefined}>{t("home")}</a>
       <a href="/learn" aria-current={active === "learn" ? "page" : undefined}>{t("learn")}</a>
       <a href="/studio" aria-current={active === "studio" ? "page" : undefined}>{t("studio")}</a>
+      <a href="/search" aria-current={active === "search" ? "page" : undefined}>{lang === "ar" ? "ابحث بالتلاوة" : "Find an ayah"}</a>
       <a href="/tajweed" aria-current={active === "tajweed" ? "page" : undefined}>{lang === "ar" ? "التجويد" : "Tajweed"}</a>
       <a href="/games" aria-current={active === "games" ? "page" : undefined}>{lang === "ar" ? "تحديات" : "Challenges"}</a>
       <a href="/profile" aria-current={active === "profile" ? "page" : undefined}>{lang === "ar" ? "حسابي" : "Profile"}</a>

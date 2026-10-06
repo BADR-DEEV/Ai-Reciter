@@ -99,6 +99,32 @@ class ServerTests(ServerCase):
                 self.assertNotIn("score", response.json())
                 self.assertNotIn("verdict", response.json())
 
+    def test_search_finds_the_recited_passage(self):
+        body = self.client.post("/api/search", json={"audio": pcm16()}, headers=ORIGIN).json()
+        self.assertEqual(body["verdict"], "found")
+        self.assertEqual(body["transcript"], TEXT)
+        best = body["results"][0]
+        self.assertEqual((best["start"], best["end"]), ({"surah": 112, "ayah": 1}, {"surah": 112, "ayah": 4}))
+        self.assertEqual((best["confidence"], best["juz"], body["model_used"]), ("high", [30], "plain"))
+
+    def test_search_juz_scope_and_openings(self):
+        body = self.client.post("/api/search", json={"audio": pcm16(), "juz": [1, 1]}).json()
+        self.assertEqual((body["verdict"], body["results"], body["juz"]), ("none", [], [1]))
+        with patch.object(FakeEngine, "transcribe", return_value="بسم الله الرحمن الرحيم"):
+            body = self.client.post("/api/search", json={"audio": pcm16()}).json()
+        self.assertEqual((body["verdict"], body["opening"]), ("opening_only", ["basmala"]))
+
+    def test_search_rejects_bad_requests_and_skips_silence(self):
+        for request, status in (({"audio": pcm16(.5), "juz": [31]}, 400), ({"audio": pcm16(.2)}, 400),
+                                ({"audio": pcm16(31)}, 422), ({"audio": "not base64!"}, 400)):
+            self.assertEqual(self.client.post("/api/search", json=request).status_code, status, request)
+        self.assertEqual(self.client.post("/api/search", json={"audio": pcm16()}, headers={"origin": "http://evil.test"}).status_code, 403)
+        with patch.object(FakeEngine, "transcribe", side_effect=AssertionError("Silence must not decode")):
+            body = self.client.post("/api/search", json={"audio": pcm16(value=0)}).json()
+        self.assertEqual(body["verdict"], "silent")
+        with patch.object(FakeEngine, "transcribe", return_value=""):
+            self.assertEqual(self.client.post("/api/search", json={"audio": pcm16()}).status_code, 503)
+
     def test_start_ayah_and_ping(self):
         with self.client.websocket_connect("/ws/recite", headers=ORIGIN) as ws:
             ws.send_json({"surah": 112, "start_ayah": 3})

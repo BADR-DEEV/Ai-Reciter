@@ -1,0 +1,121 @@
+/* /search: find an ayah from a recitation. The listen button is the mushaf's
+   division mark ۞ (rub el hizb): two squares, one turned, around a circle. */
+.studio-shell .find-page{--soft:#5f6b62;max-width:820px;margin:0 auto;padding:44px 24px 72px;color:var(--ink)}
+.find-hero{text-align:center;max-width:560px;margin:0 auto}
+.find-hero h1{font-family:'Manrope',sans-serif;font-size:clamp(30px,5vw,42px);font-weight:700;letter-spacing:-.02em;line-height:1.12;color:var(--deep)}
+.find-hero p{margin-top:12px;font-size:15px;line-height:1.6;color:var(--soft)}
+.find-page code{font-size:12px;background:#fff;border:1px solid #eadfcd;border-radius:6px;padding:1px 6px;color:var(--ink)}
+
+/* The listening star */
+.find-stage{display:flex;flex-direction:column;align-items:center;gap:12px;margin:40px 0 32px}
+.find-star{--level:0;position:relative;width:180px;height:180px;border-radius:50%;display:grid;place-items:center;color:#fff;
+  transform:scale(calc(1 + var(--level) * .12));transition:transform .12s ease-out}
+.find-star::before,.find-star::after{content:"";position:absolute;inset:31px;border-radius:12px;background:var(--green);transition:background .25s}
+.find-star::after{transform:rotate(45deg)}
+.find-star:hover:not(:disabled)::before,.find-star:hover:not(:disabled)::after{background:var(--deep)}
+.find-star:focus-visible{outline:2px solid var(--green);outline-offset:8px}
+.find-star-core{position:relative;z-index:1;width:80px;height:80px;border-radius:50%;display:grid;place-items:center;background:var(--deep);
+  box-shadow:0 0 0 1.5px var(--gold),0 0 0 6px var(--deep)}
+.find-star-ring{position:absolute;inset:4px;border-radius:50%;border:1.5px solid var(--gold);opacity:0;pointer-events:none}
+.find-star.listening::before{animation:find-turn 16s linear infinite}
+.find-star.listening::after{animation:find-turn-45 16s linear infinite}
+.find-star.listening .find-star-ring{animation:find-ripple 2.4s ease-out infinite}
+.find-star.listening .find-star-ring:nth-child(2){animation-delay:.8s}
+.find-star.listening .find-star-ring:nth-child(3){animation-delay:1.6s}
+.find-star.searching::before,.find-star.reading::before{animation:find-turn 2.4s linear infinite}
+.find-star.searching::after,.find-star.reading::after{animation:find-turn-45 2.4s linear infinite reverse}
+.find-star.searching:disabled,.find-star.reading:disabled{opacity:1;cursor:progress}
+@keyframes find-turn{to{transform:rotate(360deg)}}
+@keyframes find-turn-45{from{transform:rotate(45deg)}to{transform:rotate(405deg)}}
+@keyframes find-ripple{from{transform:scale(.8);opacity:.9}to{transform:scale(1.55);opacity:0}}
+.find-status{min-height:22px;font-size:14px;color:var(--soft);text-align:center}
+.find-page .find-upload{padding:9px 16px;font-size:13px}
+.find-hint{max-width:420px;font-size:12px;line-height:1.5;color:var(--soft);text-align:center}
+
+/* Scope */
+.find-scope{border:1px solid var(--line);border-radius:16px;background:#fff;padding:14px 18px}
+.find-scope-bar{display:flex;align-items:center;justify-content:space-between;gap:10px 16px;flex-wrap:wrap}
+.find-scope-bar p{font-size:14px;color:var(--soft)}
+.find-scope-bar strong{font-weight:600;color:var(--deep)}
+.find-switch{position:relative;display:inline-flex;align-items:center;gap:10px;font-size:13px;color:var(--deep);cursor:pointer}
+.find-switch input{position:absolute;width:1px;height:1px;opacity:0}
+.find-switch-track{position:relative;flex:none;width:38px;height:22px;border-radius:11px;background:#cfd8d0;transition:background .2s}
+.find-switch-track::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #16493733;transition:inset-inline-start .2s}
+.find-switch input:checked+.find-switch-track{background:var(--green)}
+.find-switch input:checked+.find-switch-track::after{inset-inline-start:19px}
+.find-switch input:focus-visible+.find-switch-track{outline:2px solid var(--green);outline-offset:3px}
+.find-switch:has(input:disabled){opacity:.5;cursor:not-allowed}
+.find-juz{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.find-juz-presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.find-juz-presets button{border:1px solid var(--line);border-radius:20px;padding:5px 12px;font-size:12px;color:var(--green);background:#fff}
+.find-juz-presets button[aria-pressed=true]{background:var(--mint);border-color:#b9d3bf}
+.find-juz-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
+.find-juz-grid button{min-width:0;display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 3px 6px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.find-juz-grid button:hover:not(:disabled){border-color:#b9d3bf}
+.find-juz-grid strong{font-family:'Manrope',sans-serif;font-size:17px;line-height:1.2;color:var(--deep)}
+.find-juz-grid small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--soft)}
+.find-juz-grid small[lang=ar]{font-family:'Amiri',serif;font-size:12px}
+.find-juz-grid button.on{background:var(--mint);border-color:var(--green);box-shadow:inset 0 0 0 1px var(--green)}
+.find-juz-grid button.on strong{color:var(--green)}
+.find-note{margin-top:10px;font-size:12px;line-height:1.6;color:var(--soft)}
+
+/* Results */
+.find-results{margin-top:28px;scroll-margin-top:16px}
+.find-rescope{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;border-radius:12px;background:#fbf8ef;border:1px solid #ece3c9;font-size:13px;color:#7a6a3f}
+.find-rescope .btn-quiet{padding:7px 12px;font-size:12px}
+.find-match{border:1px solid var(--line);border-radius:18px;background:#fff;padding:20px 22px}
+.find-match.primary{border-color:#cfe0d2;box-shadow:0 14px 34px -22px #16493766;animation:find-reveal .4s ease-out}
+@keyframes find-reveal{from{opacity:0;transform:translateY(6px)}}
+.find-match-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.find-match h2,.find-match h3{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 12px;font-family:'Manrope',sans-serif;font-size:23px;line-height:1.3;color:var(--deep)}
+.find-match h3{font-size:17px}
+.find-surah-ar{font-family:'Amiri',serif;font-weight:400;font-size:1.2em;color:var(--green)}
+.find-where{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:4px;font-size:14px;color:var(--soft)}
+.find-juz-tag{padding:1px 9px;border:1px solid #e1d8bd;border-radius:20px;background:#fbf8ef;font-size:12px;color:#7a6a3f}
+.find-confidence{padding:4px 11px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+.find-confidence.high{background:var(--mint);color:var(--green)}
+.find-confidence.medium{background:#fbf6e9;color:#7f6527}
+.find-confidence.low{background:#f8eeeb;color:#97544a}
+.find-text{margin-top:14px;padding:4px 18px;border:1px solid #ece8da;border-radius:14px;background:var(--paper)}
+.find-ayah{padding:12px 0}
+.find-ayah+.find-ayah{border-top:1px solid #efeadb}
+.find-arabic{font-family:'Amiri',serif;font-size:30px;line-height:2.1;text-align:start;color:var(--deep)}
+.find-match:not(.primary) .find-arabic{font-size:24px}
+.find-arabic .quran-word.pending{color:#5d6b62}
+.find-latin{margin-top:2px;font-size:14px;line-height:1.6;color:var(--green);text-align:left}
+.find-evidence{margin-top:12px;font-size:13px;line-height:1.6;color:var(--soft)}
+.find-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:14px}
+.find-actions .ayah-listen{margin:0}
+.find-actions .btn-quiet{padding:7px 14px;font-size:13px}
+.find-match .tafsir-panel{margin:10px 0 0;padding:0;border:0;background:none}
+.find-match .tafsir-panel>.btn-quiet{padding:7px 14px;font-size:13px}
+.find-match .tafsir-panel>div{margin-top:10px;padding:14px 16px;border:1px solid var(--line);border-radius:12px}
+.find-tip{text-align:center}
+.find-more{display:flex;align-items:center;gap:6px;margin:16px auto 0;padding:9px 18px;border:1px solid var(--line);border-radius:24px;background:#fff;color:var(--green);font-size:13px;font-weight:600}
+.find-more:hover{background:var(--mint)}
+.find-more svg{transition:transform .2s}
+.find-more[aria-expanded=true] svg{transform:rotate(180deg)}
+.find-others{display:grid;gap:12px;margin:14px 0 0;padding:0;list-style:none}
+.find-others .find-match{padding:16px 18px;border-radius:14px}
+.find-empty{padding:22px;border:1px solid var(--line);border-radius:16px;background:#fff;font-size:15px;line-height:1.6;text-align:center;color:var(--deep)}
+.find-heard{margin-top:24px;padding:16px 18px;border:1px dashed #d4ded5;border-radius:14px}
+.find-heard h3{font-size:13px;font-weight:600;color:var(--soft)}
+.find-heard p[lang=ar]{margin-top:4px;font-family:'Amiri',serif;font-size:21px;line-height:1.8;color:var(--ink)}
+.find-heard audio{display:block;width:100%;max-width:340px;height:36px;margin-top:10px}
+
+@media (max-width:720px){.find-juz-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+@media (max-width:560px){
+  .studio-shell .find-page{padding:28px 16px 56px}
+  .find-stage{margin:32px 0 26px}
+  .find-star{width:150px;height:150px}
+  .find-star::before,.find-star::after{inset:26px}
+  .find-star-core{width:68px;height:68px}
+  .find-match{padding:16px}
+  .find-text{padding:2px 12px}
+  .find-arabic{font-size:26px}
+}
+@media (max-width:380px){.find-juz-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce){
+  .find-star,.find-star::before,.find-star::after,.find-star-ring,.find-match.primary{animation:none!important;transition:none}
+  .find-star{transform:none}
+}

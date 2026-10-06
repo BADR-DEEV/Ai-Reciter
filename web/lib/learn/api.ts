@@ -9,7 +9,8 @@ export type SoundResult = { verdict: "correct" | "close" | "other"; heard: numbe
 export type ReadingResult = { verdict: "correct" | "close" | "other"; score: number; transcript: string; words: { index: number; text: string; status: "correct" | "missed"; heard: string | null; tags?: string[] }[] };
 export type PracticeResult = (SoundResult | ReadingResult | { verdict: "silent" }) & ModelUsage;
 
-function base64(pcm: Float32Array) {
+/** 16 kHz mono PCM as base64 little-endian PCM16, the body format of the model service. */
+export function pcmBase64(pcm: Float32Array) {
   const bytes = new Uint8Array(pcm.length * 2);
   const view = new DataView(bytes.buffer);
   pcm.forEach((v, i) => view.setInt16(i * 2, Math.max(-1, Math.min(1, v)) * 32767, true));
@@ -22,7 +23,7 @@ function base64(pcm: Float32Array) {
 export async function checkPractice(pcm: Float32Array, body: { mode: "sound" | "reading"; target: string; alternatives?: string[]; model?: ModelName }, signal?: AbortSignal): Promise<PracticeResult> {
   const response = await fetch(`${API}/api/practice`, {
     method: "POST", signal, headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...body, alternatives: body.alternatives || [], audio: base64(pcm) }),
+    body: JSON.stringify({ ...body, alternatives: body.alternatives || [], audio: pcmBase64(pcm) }),
   });
   if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || `The model service returned ${response.status}`);
   return response.json();

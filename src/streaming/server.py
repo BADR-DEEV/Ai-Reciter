@@ -17,6 +17,7 @@ from transformers import WhisperForConditionalGeneration, WhisperProcessor
 from .matcher import RecitationTracker, words
 from .live_buffer import AudioQueue, TranscriptOverlap
 from . import practice as lessons
+from .search import JUZ_STARTS, load_index, strip_openings
 from src.training_with_gpu.decoding_safety import load_private_adapter, generation_diagnostics
 from .model_options import ROOT, ModelSpec, default_name, models_from_env, resolve_local_model
 from .tajweed_tags import TAG, carry_tags, strip_tags, tag_list, tagged_words, transfer_tags
@@ -356,6 +357,56 @@ async def practice(body: PracticeRequest, request: Request):
         if feedback is not None:
             result["tajweed_feedback"] = feedback
     return result
+
+
+MAX_SEARCH_SECONDS = 30  # one Whisper window
+
+
+class SearchRequest(BaseModel):
+    audio: str = Field(max_length=SAMPLE_RATE * MAX_SEARCH_SECONDS * 2 * 4 // 3 + 8)  # base64 PCM16
+    juz: list[int] = Field(default_factory=list, max_length=len(JUZ_STARTS))  # empty: the whole Quran
+    limit: int = Field(default=3, ge=1, le=5)
+
+
+@app.post("/api/search")
+async def search(body: SearchRequest, request: Request):
+    """Which passage is this? A blind transcript of one clip, then its best places in the Quran."""
+    origin = request.headers.get("origin")
+    if origin is not None and origin not in ORIGINS:
+        raise HTTPException(403, "Origin not allowed")
+    if any(not 1 <= juz <= len(JUZ_STARTS) for juz in body.juz):
+        raise HTTPException(400, f"Juz must be between 1 and {len(JUZ_STARTS)}")
+    try:
+        raw = base64.b64decode(body.audio, validate=True)
+    except ValueError:
+        raise HTTPException(400, "Audio must be base64 PCM16")
+    if len(raw) % 2 or len(raw) < SAMPLE_RATE:
+        raise HTTPException(400, "Recording is too short")
+    if len(raw) > SAMPLE_RATE * MAX_SEARCH_SECONDS * 2:
+        raise HTTPException(400, f"Search clips are limited to {MAX_SEARCH_SECONDS} seconds")
+    try:
+        engine, model_used, fallback = await app.state.models.select(None)  # words only: the default engine
+    except ModelUnavailable as exc:
+        raise HTTPException(exc.status, str(exc))
+    scope = sorted(set(body.juz))
+    used = {"model_used": model_used, "fallback_reason": fallback, "juz": scope}
+    audio = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768
+    if lessons.is_silent(audio):
+        return {"verdict": "silent", "transcript": "", "heard": [], "opening": [], "results": [], **used}
+    async with engine.lock:
+        transcript = await asyncio.to_thread(engine.transcribe, audio)
+        diagnostics = getattr(engine, "last_diagnostics", None)
+    transcript, heard, _ = heard_with_tags(transcript)
+    if not transcript or diagnostics is not None and not diagnostics["scorable"]:
+        raise HTTPException(503, "The model could not recognise words in this recording. Try a clearer or slightly longer clip.")
+    try:
+        index = await asyncio.to_thread(load_index, ASSETS / "surahs")
+    except FileNotFoundError:
+        raise HTTPException(503, "The Quran text is not cached yet. Start the web app once, or run python src/dataset_collection/cache_quran_pages.py --skip-metadata.")
+    heard, opening = strip_openings(heard)
+    results = await asyncio.to_thread(index.search, heard, scope, body.limit) if heard else []
+    verdict = "found" if results else "opening_only" if opening and not heard else "none"
+    return {"verdict": verdict, "transcript": transcript, "heard": heard, "opening": opening, "results": results, **used}
 
 
 @app.get("/health")

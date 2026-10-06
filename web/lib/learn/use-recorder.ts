@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const RATE = 16000;
-const MAX_SECONDS = 12;
 type Handles = { context?: AudioContext; stream?: MediaStream; node?: AudioWorkletNode; source?: AudioNode };
 
-/** Record one short utterance as 16 kHz mono PCM, stopping after trailing silence. */
-export function useRecorder() {
+/** Record one utterance as 16 kHz mono PCM, stopping after trailing silence or `maxSeconds`. */
+export function useRecorder({ maxSeconds = 12, silenceSeconds = 0.9 } = {}) {
   const [recording, setRecording] = useState(false);
   const [level, setLevel] = useState(0);
   const [error, setError] = useState("");
@@ -68,14 +67,14 @@ export function useRecorder() {
       const rms = Math.sqrt(frame.reduce((s, v) => s + v * v, 0) / frame.length);
       setLevel(Math.min(1, rms * 10));
       if (rms > 0.015) { voiced += frame.length; lastVoice = samples; }
-      // Stop after 0.9 s of quiet once at least 0.25 s of voice was heard.
-      if ((voiced > RATE * 0.25 && samples - lastVoice > RATE * 0.9) || samples > RATE * MAX_SECONDS) stop();
+      // Stop after `silenceSeconds` of quiet once at least 0.25 s of voice was heard.
+      if ((voiced > RATE * 0.25 && samples - lastVoice > RATE * silenceSeconds) || samples > RATE * maxSeconds) stop();
     };
     source.connect(node); node.connect(context.destination);
     await context.resume();
     setRecording(true);
     return new Promise(resolve => { resolver.current = resolve; });
-  }, [stop]);
+  }, [stop, maxSeconds, silenceSeconds]);
 
   return { record, stop, recording, level, error };
 }

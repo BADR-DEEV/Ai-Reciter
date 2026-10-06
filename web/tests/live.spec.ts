@@ -42,3 +42,15 @@ test("uploaded recording uses the GPU without requesting a microphone", async ({
   await expect(page.getByRole("button", { name: "Upload audio to test" })).toBeEnabled({ timeout: 30000 });
   await expect(page.locator(".error-message")).toHaveCount(0);
 });
+
+test("microphone search finds the recited surah", async ({ page }) => {
+  test.skip(!audio, "Set RECITER_LIVE_TEST_AUDIO to a Fātiḥah PCM WAV fixture and start the backend");
+  test.setTimeout(60000);
+  await page.goto("/search");
+  await page.getByRole("button", { name: "Listen and find the ayah" }).click();
+  await expect(page.getByRole("button", { name: "Stop and search" })).toBeVisible();
+  // The recorder stops by itself after the fixture's trailing quiet (or 20 s at most).
+  await expect(page.locator(".find-match.primary h2")).toContainText("Al-Fātiḥah", { timeout: 40000 });
+  await expect(page.locator(".find-heard p[lang=ar]")).not.toHaveText("—");
+  await expect(page.locator(".error-message")).toHaveCount(0);
+});

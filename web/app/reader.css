@@ -112,7 +112,7 @@ html[dir="rtl"] .studio-shell .eyebrow{letter-spacing:0}
   .studio-shell .studio-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"reader" "commentary" "session"}
   .commentary-sidebar{position:static;max-height:480px}
   .lh-header{height:auto;min-height:70px;flex-wrap:wrap;gap:12px;padding-block:12px}
-  .lh-nav{order:3;flex-basis:100%;height:auto;min-height:38px;justify-content:space-between;gap:12px}
+  .lh-nav{order:3;flex-basis:100%;height:auto;min-height:38px;flex-wrap:wrap;justify-content:flex-start;gap:2px 16px}
   .lh-nav a{display:flex;font-size:12px}
   .lh-right{gap:8px}
   .studio-shell .session-bar{gap:16px}
