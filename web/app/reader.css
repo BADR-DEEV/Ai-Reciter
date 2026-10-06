@@ -15,13 +15,13 @@ html[dir="rtl"] .studio-shell .view-switch button{font-size:14px}
 .ayah-reading-line{font-family:'Amiri',serif;font-size:32px;line-height:1.95}
 .phonetic-text .ayah-reading-line{font-family:'DM Sans',sans-serif;font-size:clamp(24px,2.4vw,36px);line-height:1.8;text-align:start;overflow-wrap:anywhere}
 .current-phonetic{font-size:21px;line-height:1.7;overflow-wrap:anywhere;margin-block:14px}
-.ayah-listen{font-family:'DM Sans',sans-serif;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;line-height:1.5;margin-block:10px;text-align:start}
+.ayah-listen{font-family:var(--font-body);display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;line-height:1.5;margin-block:10px;text-align:start}
 .ayah-listen .btn-listen{font-size:12px;padding:7px 12px}
 .ayah-listen small{max-width:400px;color:var(--red)}
-.reading-aid-warning,.phonetic-review{font:12px/1.7 'DM Sans',sans-serif;color:#75602f;padding-block:10px;text-align:start}
-.ayah-meaning-pane{font:14px/1.8 'DM Sans',sans-serif;text-align:start}
+.reading-aid-warning,.phonetic-review{font:12px/1.7 var(--font-body);color:#75602f;padding-block:10px;text-align:start}
+.ayah-meaning-pane{font:14px/1.8 var(--font-body);text-align:start}
 .ayah-meaning-pane p{font-size:17px;line-height:1.85;margin-block:12px}
-.ayah-meaning-pane p[lang="ar"]{font-family:'Amiri',serif;font-size:23px}
+.ayah-meaning-pane p[lang="ar"]{font-family:var(--font-arabic);font-size:18px;line-height:1.9}
 .tajweed-word.pending{color:var(--ink)}
 .ayah-reading-line .quran-word{font-weight:400;letter-spacing:normal}
 /* Color changes must not change the font run: synthetic bold and inline boxes
@@ -52,7 +52,7 @@ html[dir="rtl"] .studio-shell .view-switch button{font-size:14px}
 .tajweed-rule-notes li{font-size:12px;line-height:1.6;display:flex;flex-wrap:wrap;gap:4px 8px}
 .tajweed-rule-notes li span:last-child{color:#5f6b62;flex-basis:100%}
 .tajweed-count{font-size:11px;color:var(--green);background:var(--mint);border-radius:4px;padding:0 6px}
-.tajweed-inspector{position:fixed;z-index:60;width:min(340px,calc(100vw - 24px));transform:translate(-50%,-100%);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px #1a3a2a26;padding:12px 14px;font:13px/1.6 'DM Sans',sans-serif;color:var(--ink);text-align:start}
+.tajweed-inspector{position:fixed;z-index:60;width:min(340px,calc(100vw - 24px));transform:translate(-50%,-100%);background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px #1a3a2a26;padding:12px 14px;font:13px/1.6 var(--font-body);color:var(--ink);text-align:start}
 .tajweed-inspector.below{transform:translate(-50%,0)}
 .tajweed-inspector-head{display:flex;align-items:center;justify-content:space-between;font:26px/1.6 'Amiri',serif;border-bottom:1px solid var(--line);margin-bottom:6px}
 .tajweed-inspector section+section{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px}
@@ -78,7 +78,7 @@ html[dir="rtl"] .studio-shell .view-switch button{font-size:14px}
 .tajweed-mistake-rule{font-size:12px}
 .tajweed-mistake-fix{font-size:11px;color:#5f6b62;line-height:1.5}
 .tj-flash{outline:2px solid #c0392b;outline-offset:3px;border-radius:4px}
-html[dir="rtl"] .studio-shell h1{font-family:'Amiri',serif;letter-spacing:0}
+html[dir="rtl"] .studio-shell h1{font-family:var(--font-arabic);letter-spacing:0}
 html[dir="rtl"] .studio-shell .eyebrow{letter-spacing:0}
 .course-language-note{font-size:14px;line-height:1.8;padding:12px 16px;margin-block:16px;background:var(--gold-wash);border-radius:10px}
 /* Fixed physical left sidebar in BOTH UI languages; text direction is local. */
@@ -95,7 +95,7 @@ html[dir="rtl"] .studio-shell .eyebrow{letter-spacing:0}
 .commentary-sidebar .tafsir-panel h3{font-size:13px}
 .commentary-sidebar .tafsir-panel small{font-size:10px;line-height:1.7}
 .commentary-sidebar .ayah-meaning-pane p{font-size:15px}
-.commentary-sidebar .ayah-meaning-pane p[lang="ar"]{font-size:22px}
+.commentary-sidebar .ayah-meaning-pane p[lang="ar"]{font-size:16px}
 /* Outline overlays do not change Arabic shaping, text or word widths. */
 .playback-word{outline:2px solid var(--green);outline-offset:2px;border-radius:0!important;background:#dfeccc!important;color:var(--ink)}
 .studio-shell .text-ayah.playback-ayah{outline:1px solid var(--green);outline-offset:-1px;background:#f3f7ed}
@@ -160,7 +160,7 @@ html[dir="rtl"] .studio-shell .eyebrow{letter-spacing:0}
 .memorize .text-mushaf .quran-word.hinted.pending,.memorize .current-text .quran-word.hinted.pending{color:#8a7a4d;text-decoration:underline dotted #c9b98a;text-underline-offset:8px}
 .memorize .text-mushaf .quran-word.correct{animation:memorize-reveal .35s ease-out}
 @keyframes memorize-reveal{from{opacity:0;filter:blur(3px)}}
-.memorize-note{display:flex;align-items:flex-start;gap:8px;max-width:640px;margin:0 auto 10px;padding:9px 14px;border-radius:10px;background:#f6f1e1;color:#6f6440;font:13px/1.55 'DM Sans',sans-serif;text-align:start}
+.memorize-note{display:flex;align-items:flex-start;gap:8px;max-width:640px;margin:0 auto 10px;padding:9px 14px;border-radius:10px;background:#f6f1e1;color:#6f6440;font:13px/1.55 var(--font-body);text-align:start}
 .memorize-note svg{margin-top:2px}
 .ayah-meaning-pane .memorize-tafsir-note,.memorize-tafsir-note{padding:12px 0;font-size:12px;line-height:1.6;color:#6b766e;border-top:1px solid var(--line)}
 .memorize-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:10px;font-size:12px;color:#6b766e}

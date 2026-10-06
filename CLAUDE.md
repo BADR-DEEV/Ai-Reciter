@@ -2,6 +2,8 @@
 
 Qālūn Quran recitation learning app: a Python Whisper inference API (`src/streaming`) and a Next.js web app (`web/`).
 
+**Run:** `python run.py` (or `./run.sh`, `run.bat`) sets up `.venv`, web packages, models and data, then starts the API (:8000) and web (:3000); see `README.md`.
+
 **Start here:** [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md) lists which Hugging Face model and datasets to pull (private org `Mathani-Ayat`), where they go locally, how to run both servers, Mac-specific workarounds and the `/dev` page.
 
 - Default model: `Mathani-Ayat/rattil-qaloon-v4` → `runs/rattil_qaloon_v4`, served with `python -m src.streaming.serve --model rattil-v4`; it also serves `rattil-qaloon-tajweed-v2` for "Check my ahkam" when `runs/rattil_qaloon_tajweed_v2` exists.

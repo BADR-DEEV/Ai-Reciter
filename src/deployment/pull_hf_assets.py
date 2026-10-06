@@ -93,6 +93,17 @@ def pull(repo_id, out, revision, repo_type="model", patterns=None):
             time.sleep(RATE_WAIT)
 
 
+def link_directory(link, target):
+    """Symlink a folder; on Windows without symlink rights, fall back to a junction (no admin needed)."""
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError:
+        if os.name != "nt":
+            raise
+        import _winapi
+        _winapi.CreateJunction(str(target.resolve()), str(link))
+
+
 def link_app_readers(dataset_root):
     for name in APP_READERS:
         target, link = dataset_root / name, ROOT / "src/dataset_collection" / name
@@ -101,7 +112,7 @@ def link_app_readers(dataset_root):
         if link.exists() or link.is_symlink():
             print(f"Kept existing {link.relative_to(ROOT)}; not linking the Hub copy.", flush=True)
             continue
-        link.symlink_to(target, target_is_directory=True)
+        link_directory(link, target)
         print(f"Linked {link.relative_to(ROOT)} -> {target.relative_to(ROOT)}", flush=True)
 
 

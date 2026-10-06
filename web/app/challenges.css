@@ -16,7 +16,7 @@
 .tafsir-panel p[lang=ar]{font-size:23px;line-height:1.8}
 .challenge-main{max-width:1200px;margin:auto;padding:38px clamp(16px,4vw,40px) 70px}
 .challenge-hero{display:flex;justify-content:space-between;gap:30px;align-items:center;margin-bottom:30px}
-.challenge-hero h1{font-family:'Manrope',sans-serif;color:var(--deep);font-size:clamp(28px,4vw,42px);letter-spacing:-1px;margin:0}
+.challenge-hero h1{font-family:var(--font-display);color:var(--deep);font-size:clamp(28px,4vw,42px);letter-spacing:-1px;margin:0}
 .challenge-hero p{max-width:65ch;color:var(--muted);line-height:1.7}
 .challenge-score{display:flex;flex-direction:column;gap:8px;min-width:150px;padding:20px;border-radius:18px;background:var(--mint);color:var(--green);font-size:13px}
 .challenge-score strong{font-size:28px}
@@ -39,7 +39,7 @@
 .challenge-options.stacked{grid-template-columns:1fr}
 .order-parts{display:flex;flex-direction:column;gap:12px;text-align:start}
 .order-part{display:flex;gap:12px;align-items:flex-start}
-.order-part>b{flex:none;display:grid;place-items:center;width:26px;height:26px;margin-top:8px;border-radius:50%;background:var(--mint);color:var(--green);font:600 13px 'DM Sans',sans-serif}
+.order-part>b{flex:none;display:grid;place-items:center;width:26px;height:26px;margin-top:8px;border-radius:50%;background:var(--mint);color:var(--green);font:600 13px var(--font-body)}
 .order-part>span{min-width:0}
 .order-part [lang=ar]{display:block;font-size:22px}
 .order-part .option-translit{text-align:right}

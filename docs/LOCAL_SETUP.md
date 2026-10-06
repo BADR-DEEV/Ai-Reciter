@@ -1,6 +1,7 @@
 # Local setup: where the model and data come from
 
-Read this first in a new session. It covers what to download, where it goes and
+To just run Rattil, use the one command in the [README](../README.md) (`python run.py`): it does all of
+the steps below. Read this first in a new session. It covers what to download, where it goes and
 how to run Rattil. The `/dev` page (dev mode only) shows the same information live.
 
 ## Hugging Face sources (private, org `Mathani-Ayat`)

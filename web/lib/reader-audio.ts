@@ -8,6 +8,8 @@ const ROOT = path.resolve(process.cwd(), "..");
 const STATUS = path.join(ROOT, "data/hf/pull-status.json");
 const COMMAND = ["src/deployment/pull_hf_assets.py", "--skip-model", "--readers-only"];
 export const MANUAL_COMMAND = `python ${COMMAND.join(" ")}`;
+/** run.py sets RATTIL_PYTHON to its .venv; Windows installs Python as `python`, not `python3`. */
+export const PYTHON = process.env.RATTIL_PYTHON || (process.platform === "win32" ? "python" : "python3");
 
 export type ReaderAudioState = {
   state: "ready" | "missing" | "downloading" | "waiting" | "failed";
@@ -38,8 +40,8 @@ export function startReaderAudioDownload() {
     const current = await readerAudioState();
     if (current.state !== "missing" && current.state !== "failed") return current;
     await mkdir(path.dirname(STATUS), { recursive: true });
-    const child = spawn(process.env.RATTIL_PYTHON || "python3", COMMAND, {
-      cwd: ROOT, detached: true, stdio: "ignore", env: { ...process.env, HF_HUB_DISABLE_PROGRESS_BARS: "1" },
+    const child = spawn(PYTHON, COMMAND, {
+      cwd: ROOT, detached: true, stdio: "ignore", windowsHide: true, env: { ...process.env, PYTHONUTF8: "1", HF_HUB_DISABLE_PROGRESS_BARS: "1" },
     });
     const failed = (message: string) => writeFile(STATUS, JSON.stringify({ state: "failed", message })).catch(() => {});
     child.on("error", error => void failed(`Could not start Python (${error.message}). Set RATTIL_PYTHON or run: ${MANUAL_COMMAND}`));

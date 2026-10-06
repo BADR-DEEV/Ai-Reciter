@@ -7,7 +7,7 @@
 .tj-jump a{border:1px solid var(--line);background:#fff;border-radius:20px;padding:6px 14px;font-size:13px;color:var(--green)}
 .tj-jump a:hover{background:var(--mint)}
 .tj-section{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px 24px;margin-bottom:20px;scroll-margin-top:16px}
-.tj-section h2{font-family:'Manrope',sans-serif;font-size:20px;color:var(--deep);margin-bottom:6px}
+.tj-section h2{font-family:var(--font-display);font-size:20px;color:var(--deep);margin-bottom:6px}
 .tj-lead{font-size:13px;color:#5f6b62;margin-bottom:14px}
 .tj-letter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:8px;direction:rtl}
 .tj-letter-grid button{display:flex;flex-direction:column;align-items:center;border:1px solid var(--line);border-radius:10px;padding:6px 2px;background:var(--paper)}
@@ -33,24 +33,24 @@
 .tj-group li{scroll-margin-top:16px}
 .tj-group li p{font-size:13px;margin:2px 0;color:#4a564d}
 .tj-rule-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 10px}
-.tj-rule-head [lang="ar"]{font:18px/1.4 'Amiri',serif;color:#5f6b62}
+.tj-rule-head [lang="ar"]{font:18px/1.4 var(--font-arabic);color:#5f6b62}
 .tj-page{font-size:11px;color:var(--muted)}
 .tj-wajh{font-size:12px;color:#5a4a00!important}
-.tj-examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-.tj-examples a,.tj-found a{display:inline-flex;align-items:baseline;gap:6px;border:1px solid #e8e4d5;background:var(--paper);border-radius:8px;padding:0 10px}
+.tj-examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.tj-examples a,.tj-found a{display:inline-flex;align-items:baseline;gap:6px;border:1px solid #e8e4d5;background:var(--paper);border-radius:8px;padding:4px 10px 0}
 .tj-examples a:hover,.tj-found a:hover{border-color:var(--green)}
-.tj-example{font:28px/1.9 'Amiri',serif;color:var(--ink)}
+.tj-example{font:28px/2.3 'Amiri',serif;color:var(--ink)}
 .tj-examples small,.tj-found small{font-size:10px;color:var(--muted)}
 .tj-topic{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:10px;background:var(--paper);scroll-margin-top:16px}
 .tj-topic summary{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:14px;color:var(--deep)}
 .tj-topic summary svg{color:var(--tj-riwaya,#7a1fbf)}
-.tj-topic-ar{font:19px/1.4 'Amiri',serif;font-weight:400;color:#5f6b62}
+.tj-topic-ar{font:19px/1.4 var(--font-arabic);font-weight:400;color:#5f6b62}
 .tj-topic summary .mini-pill{margin-inline-start:auto;font-size:10px}
 .tj-topic>p{font-size:13px;margin:10px 0 4px}
 .tj-points{font-size:13px;margin:4px 0;padding-inline-start:20px}
 .tj-found h4{font-size:12px;color:var(--muted);margin:10px 0 6px}
 .tj-found>div{display:flex;flex-wrap:wrap;gap:6px;max-height:260px;overflow:auto}
-.tj-found a span{font:22px/1.8 'Amiri',serif;color:var(--tj-riwaya,#7a1fbf)}
+.tj-found a span{font:22px/2.2 'Amiri',serif;color:var(--tj-riwaya,#7a1fbf)}
 @media(max-width:760px){
   .tajweed-page{padding:20px 16px 0}
   .tj-section{padding:16px}

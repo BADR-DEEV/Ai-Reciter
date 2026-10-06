@@ -1,10 +1,10 @@
 .dev-page{max-width:1100px}
 .dev-page code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--mint);padding:1px 5px;border-radius:4px;word-break:break-all}
 .dev-card{margin-top:20px;padding:clamp(18px,3vw,28px);border:1px solid var(--line);border-radius:18px;background:#fff}
-.dev-card h2{display:flex;align-items:center;gap:10px;font-family:'Manrope',sans-serif;font-size:19px;color:var(--deep)}
+.dev-card h2{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-size:19px;color:var(--deep)}
 .dev-card h3{font-size:13px;color:var(--green);margin:22px 0 8px}
 .dev-sub{color:var(--muted);font-size:12px;margin-top:6px}
-.dev-count{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;color:var(--muted)}
+.dev-count{margin-left:auto;font-family:var(--font-body);font-size:12px;font-weight:500;color:var(--muted)}
 .dev-warn{margin-top:14px;padding:12px 14px;border-radius:10px;background:#fff4f0;color:#a05b50;line-height:1.7}
 .dev-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#c9cec3;flex-shrink:0}
 .dev-dot.ok{background:#4f9a6a}.dev-dot.bad{background:var(--red)}

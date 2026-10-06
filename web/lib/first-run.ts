@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import path from "node:path";
-import { startReaderAudioDownload } from "./reader-audio";
+import { PYTHON, startReaderAudioDownload } from "./reader-audio";
 import { RECITERS } from "./reciters";
 
 /** Generates or fetches everything a fresh clone lacks (none of it is in Git). Each step only runs when its output is missing. */
@@ -12,7 +12,7 @@ const exists = (p: string) => access(p).then(() => true, () => false);
 function run(label: string, args: string[], env: Record<string, string> = {}) {
   return new Promise<boolean>(resolve => {
     console.log(`[rattil] ${label}…`);
-    const child = spawn(process.env.RATTIL_PYTHON || "python3", args, { cwd: ROOT, stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, ...env } });
+    const child = spawn(PYTHON, args, { cwd: ROOT, stdio: ["ignore", "ignore", "pipe"], windowsHide: true, env: { ...process.env, PYTHONUTF8: "1", ...env } });
     let errors = "";
     child.stderr.on("data", chunk => { errors = (errors + chunk).slice(-4000); });
     child.on("error", error => { console.warn(`[rattil] ${label}: could not start Python (${error.message}). Set RATTIL_PYTHON.`); resolve(false); });

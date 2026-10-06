@@ -7,7 +7,7 @@
 .learn-shell{min-height:100vh;background:var(--background);color:var(--ink)}
 .learn-shell a{color:inherit}
 .learn-shell :focus-visible{outline:2px solid var(--focus);outline-offset:3px;border-radius:8px}
-[lang="ar"]{font-family:'Amiri',serif}
+[lang="ar"]:not(:where(html,.learn-shell,.lh-lang)){font-family:'Amiri',serif}
 
 /* Header */
 .lh-header{display:flex;align-items:center;gap:40px;padding:0 clamp(16px,4vw,48px);height:76px;border-bottom:1px solid var(--line);background:#fafcf8}
@@ -43,8 +43,8 @@
 .landing{max-width:1240px;margin:0 auto;padding:0 clamp(16px,4vw,48px) 80px}
 .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:clamp(28px,5vw,72px);align-items:center;padding:clamp(36px,6vw,80px) 0 56px}
 .hero-kicker{color:var(--gold-deep);font-weight:600;font-size:14px;margin:0 0 14px}
-.hero h1{font-family:'Manrope',sans-serif;font-size:clamp(34px,4.6vw,56px);line-height:1.08;letter-spacing:-2px;font-weight:700;color:var(--deep);margin:0}
-[dir="rtl"] .hero h1{font-family:'Amiri',serif;letter-spacing:0;line-height:1.35}
+.hero h1{font-family:var(--font-display);font-size:clamp(34px,4.6vw,56px);line-height:1.08;letter-spacing:-2px;font-weight:700;color:var(--deep);margin:0}
+[dir="rtl"] .hero h1{font-family:var(--font-arabic);letter-spacing:0;line-height:1.35}
 .hero-body{font-size:17px;line-height:1.65;color:#56685d;margin:22px 0 30px;max-width:56ch}
 .hero-actions{display:flex;flex-wrap:wrap;gap:12px}
 .alphabet{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;background:var(--paper);border:1px solid var(--line);border-radius:22px;padding:18px}
@@ -57,10 +57,10 @@
 .alphabet-note{grid-column:1/-1;display:flex;align-items:center;gap:7px;justify-content:center;font-size:12px;color:var(--muted);margin:8px 0 0}
 .features{display:grid;grid-template-columns:repeat(3,1fr);gap:clamp(20px,4vw,56px);padding:44px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .features svg{color:var(--green)}
-.features h2{font-family:'Manrope',sans-serif;font-size:18px;letter-spacing:-.4px;margin:14px 0 8px;color:var(--deep)}
+.features h2{font-family:var(--font-display);font-size:18px;letter-spacing:-.4px;margin:14px 0 8px;color:var(--deep)}
 .features p{margin:0;line-height:1.6;color:#5f7065;font-size:15px}
 .path-preview{padding-top:48px}
-.path-preview h2{font-family:'Manrope',sans-serif;font-size:26px;letter-spacing:-.8px;color:var(--deep);margin:0 0 20px}
+.path-preview h2{font-family:var(--font-display);font-size:26px;letter-spacing:-.8px;color:var(--deep);margin:0 0 20px}
 .path-preview ol{list-style:none;margin:0;padding:0;counter-reset:unit}
 .path-preview li{display:grid;grid-template-columns:150px 1fr auto;gap:20px;align-items:center;padding:18px 0;border-bottom:1px solid var(--line)}
 .path-ar{font-size:26px;color:var(--green);text-align:end}
@@ -73,14 +73,14 @@
 .course{max-width:860px;margin:0 auto;padding:40px clamp(16px,4vw,32px) 80px}
 .course-head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:36px}
 .course-head>div{flex:1}
-.course-head h1{font-family:'Manrope',sans-serif;font-size:34px;letter-spacing:-1.2px;margin:0;color:var(--deep)}
+.course-head h1{font-family:var(--font-display);font-size:34px;letter-spacing:-1.2px;margin:0;color:var(--deep)}
 .course-head p{color:var(--muted);margin:6px 0 14px}
 .meter{height:8px;border-radius:8px;background:#e3ebe4;overflow:hidden;flex:1}
 .meter span{display:block;height:100%;background:var(--green);border-radius:8px;transition:width .35s ease}
 .unit{margin-bottom:34px}
 .unit-head{display:flex;align-items:center;gap:16px;padding-bottom:12px}
 .unit-index{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--deep);color:#fff;font-weight:700;font-size:14px;flex-shrink:0}
-.unit-head h2{font-family:'Manrope',sans-serif;font-size:20px;margin:0;letter-spacing:-.4px}
+.unit-head h2{font-family:var(--font-display);font-size:20px;margin:0;letter-spacing:-.4px}
 .unit-head p{margin:2px 0 0;color:var(--muted);font-size:14px}
 .unit-ar{margin-inline-start:auto;font-size:24px;color:#8aa18f}
 .lesson-list{list-style:none;padding:0;margin:0 0 0 17px;border-inline-start:2px solid #dfe8e0}
@@ -105,7 +105,7 @@
 .lesson-count{font-size:13px;color:var(--muted);min-width:42px;text-align:end}
 .lesson-stage{flex:1;width:100%;max-width:760px;margin:0 auto;padding:24px clamp(16px,4vw,32px) 40px;animation:stage-in .25s ease}
 @keyframes stage-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.lesson-stage h2{font-family:'Manrope',sans-serif;font-size:clamp(22px,3vw,28px);letter-spacing:-.8px;color:var(--deep);margin:0 0 20px}
+.lesson-stage h2{font-family:var(--font-display);font-size:clamp(22px,3vw,28px);letter-spacing:-.8px;color:var(--deep);margin:0 0 20px}
 .lesson-stage p{font-size:17px;line-height:1.65;color:#4a5d52;max-width:62ch}
 .repeat-note{font-size:14px!important;color:var(--gold-deep)!important;font-weight:600}
 .lesson-foot{border-top:1px solid var(--line);background:#fff;position:sticky;bottom:0}
@@ -125,7 +125,7 @@
 .step-intro .btn-primary{margin-top:10px}
 
 .letter-hero{display:flex;gap:clamp(20px,5vw,48px);align-items:center;margin-bottom:22px}
-.letter-glyph{font-size:clamp(120px,22vw,190px);line-height:1;color:var(--deep);min-width:1.1em;text-align:center;background:var(--paper);border:1px solid var(--line);border-radius:28px;padding:10px 26px 34px}
+.letter-glyph{font-size:clamp(120px,22vw,190px);line-height:1.15;color:var(--deep);min-width:1.1em;text-align:center;background:var(--paper);border:1px solid var(--line);border-radius:28px;padding:10px 26px 34px}
 .letter-hero h2{margin-bottom:8px!important}
 .letter-hero h2 span{font-weight:400;color:#8aa18f;margin-inline-start:8px}
 .letter-sound{font-size:19px!important;color:var(--ink)!important;margin:0 0 14px}
@@ -143,11 +143,11 @@
 .pair-row{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0 22px}
 .pair-card{flex:1;min-width:150px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px;border:1px solid var(--line);border-radius:18px;background:var(--paper);color:var(--deep)}
 .pair-card:hover{border-color:#bcd2c1;background:#fff}
-.pair-card span{font-size:72px;line-height:1.3}
+.pair-card span{font-size:72px;line-height:1.6}
 .pair-card strong{font-size:16px}
 .pair-card small{font-size:12px;color:var(--muted)}
 .pair-card svg{color:var(--green);margin-top:6px}
-.vowel-mark{font-size:110px!important;line-height:1.2!important;color:var(--deep)!important;margin:0!important;font-family:'Amiri',serif}
+.vowel-mark{font-size:110px!important;line-height:1.75!important;color:var(--deep)!important;margin:0!important;font-family:'Amiri',serif}
 
 .choice-prompt{display:flex;align-items:center;justify-content:center;gap:28px;min-height:150px;margin-bottom:22px;background:var(--paper);border:1px solid var(--line);border-radius:20px}
 .choice-arabic{font-size:clamp(64px,12vw,104px);line-height:1.5;color:var(--deep)}
@@ -201,7 +201,7 @@
 
 .lesson-done{max-width:560px;margin:0 auto;padding:90px 20px;text-align:center;display:flex;flex-direction:column;align-items:center}
 .lesson-done>svg{color:var(--green)}
-.lesson-done h1{font-family:'Manrope',sans-serif;font-size:34px;letter-spacing:-1px;color:var(--deep);margin:16px 0 4px}
+.lesson-done h1{font-family:var(--font-display);font-size:34px;letter-spacing:-1px;color:var(--deep);margin:16px 0 4px}
 .done-title{color:var(--muted);margin:0 0 26px}
 .done-stats{display:flex;gap:16px;margin-bottom:30px}
 .done-stats div{border:1px solid var(--line);border-radius:16px;padding:16px 26px;background:#fff;display:flex;flex-direction:column}
