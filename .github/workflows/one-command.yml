@@ -1,0 +1,41 @@
+name: One-command run
+# Manual check that run.bat / run.sh set up and start Rattil on clean Windows and macOS machines.
+# Without models only the web app is started; with models the recognition API must answer too.
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: Download the models (needs public Mathani-Ayat repos or an HF_TOKEN secret)
+        type: boolean
+        default: false
+
+jobs:
+  run:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 75
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      SKIP: ${{ inputs.models && ' ' || '--skip-models' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: run.bat --check
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: run.bat --check --no-browser %SKIP%
+      - name: run.sh --check
+        if: runner.os != 'Windows'
+        run: ./run.sh --check --no-browser $SKIP
+      - name: Second start reuses the setup
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: run.bat --check --no-browser %SKIP%

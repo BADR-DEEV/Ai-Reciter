@@ -174,7 +174,7 @@ def ensure_data():
 def web_sources():
     files = [p for d in ("app", "components", "lib") for p in (WEB / d).rglob("*") if p.is_file()]
     files += [p for p in WEB.iterdir() if p.is_file() and p.suffix in {".ts", ".json", ".mjs", ".js"}
-              and p.name != "tsconfig.tsbuildinfo"]
+              and p.name not in {"tsconfig.tsbuildinfo", "next-env.d.ts"}]  # Next rewrites these itself
     return sorted(files)
 
 
@@ -194,6 +194,8 @@ def ensure_web_build(npm, env):
 
 def port_free(port):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if not WINDOWS:  # like uvicorn and Node: a port left in TIME_WAIT by the last run is free
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             s.bind(("127.0.0.1", port))
             return True
@@ -258,7 +260,8 @@ def main():
     parser.add_argument("--beams", type=int, choices=[1, 3, 5], default=3, help="Beam search width: 3 is more accurate, 1 is faster on slow computers")
     parser.add_argument("--no-browser", action="store_true", help="Do not open the browser")
     args = parser.parse_args()
-    for name in ("SIGTERM", "SIGHUP"):  # closing the terminal must not leave the servers running
+    # Ctrl+C, Ctrl+Break and closing the terminal must all stop the servers, however run.py was launched.
+    for name in ("SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"):
         if hasattr(signal, name):
             signal.signal(getattr(signal, name), interrupted)
 

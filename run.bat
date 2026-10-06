@@ -20,8 +20,10 @@ if not errorlevel 1 (
 )
 echo Rattil needs Python 3.10-3.13 (3.12 recommended): https://www.python.org/downloads/
 echo In the installer, tick "Add python.exe to PATH", then run this again.
-pause
+if not defined CI pause
 exit /b 1
 :done
-if errorlevel 1 pause
-exit /b %errorlevel%
+set "code=%errorlevel%"
+rem Keep the window open on errors when double-clicked (not in CI).
+if not "%code%"=="0" if not defined CI pause
+exit /b %code%

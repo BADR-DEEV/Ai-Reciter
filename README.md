@@ -143,6 +143,9 @@ How they were trained and tested: [`docs/QALOON_TAJWEED.md`](docs/QALOON_TAJWEED
 cd web && npm run typecheck
 ```
 
+The **One-command run** workflow (GitHub Actions, started by hand) runs `run.bat` and `run.sh` on
+clean Windows and macOS machines.
+
 ## Limits
 
 - Recognition was trained on al-Fātiḥah and surahs 78 to 114. Other surahs work but are less accurate.
